@@ -1,0 +1,9 @@
+node_modules/
+dist/
+database.sqlite
+database.sqlite-*
+*.log
+.DS_Store
+
+# Local dev certificates (mkcert)
+.certs/
