@@ -132,4 +132,4 @@ All data is automatically saved to `localStorage`. Changes persist between brows
 
 ## License
 
-MIT
+MIT# student-system
