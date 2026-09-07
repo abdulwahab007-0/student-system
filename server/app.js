@@ -40,7 +40,12 @@ app.use(express.json());
 
 // Serve uploaded card photos. UPLOAD_DIR is <project>/uploads/cards locally and
 // /tmp/uploads/cards on Vercel — the parent dir is what we export statically.
+// On Vercel, /uploads requests are rewritten to /api/uploads (vercel.json),
+// so we mount under both paths.
 app.use('/uploads', express.static(path.join(UPLOAD_DIR, '..')));
+if (useSupabase) {
+  app.use('/api/uploads', express.static(path.join(UPLOAD_DIR, '..')));
+}
 
 // ── Initialise database (idempotent — safe to call on every cold start) ──
 await initDatabase();

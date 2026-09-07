@@ -1,12 +1,21 @@
 // ============================================================================
 // api/index.js — Vercel serverless entry point.
 //
-// Vercel maps every request under /api/* to this function. We simply re-export
-// the Express app built in server/app.js. The connection-pooled Supabase
-// backend is selected automatically when SUPABASE_DB_URL / DATABASE_URL is
-// configured in the Vercel project environment.
+// Vercel maps every request under /api/* to this function. We re-export
+// the Express app built in server/app.js.
+//
+// IMPORTANT: Vercel's filesystem routing delivers the full original URL
+// (e.g. /api/auth/login) to this function. However, some rewrite configs
+// or platform edge-cases can strip the /api prefix. Since Express routes
+// are defined WITH the /api prefix, we normalise defensively.
 // ============================================================================
 
 import app from '../server/app.js';
 
-export default app;
+export default function handler(req, res) {
+  // Ensure req.url always starts with /api so Express can match its routes.
+  if (!req.url.startsWith('/api')) {
+    req.url = '/api' + req.url;
+  }
+  return app(req, res);
+}

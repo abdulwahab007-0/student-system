@@ -4,11 +4,9 @@
   "frameworks": null,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "devCommand": "npm run dev",
   "installCommand": "npm install",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/uploads/(.*)", "destination": "/api" },
+    { "source": "/api/uploads/(.*)", "destination": "/api/uploads/$1" },
     { "source": "/(.*)", "destination": "/" }
   ]
 }
