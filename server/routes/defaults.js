@@ -8,11 +8,11 @@ export const DEFAULT_PASSWORDS = {
 export const defaultPasswordFor = role => DEFAULT_PASSWORDS[role] || 'ncbae@123';
 
 // Generate a unique username from a full name, avoiding DB collisions
-export function generateUniqueUsername(db, fullName, base) {
+export async function generateUniqueUsername(db, fullName, base) {
   const clean = (base || fullName).toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '') || 'user';
   let username = clean;
   let i = 1;
-  while (db.prepare('SELECT id FROM users WHERE username = ?').get(username)) {
+  while (await db.get('SELECT id FROM users WHERE username = ?', [username])) {
     username = `${clean}${i}`;
     i++;
   }

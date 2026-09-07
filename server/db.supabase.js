@@ -1,0 +1,421 @@
+// ============================================================================
+// server/db.supabase.js — Supabase (PostgreSQL) backend for the e-Student
+// Management System. Drop-in data layer that mirrors server/db.js's schema but
+// connects to a Supabase Postgres database via node-postgres (`pg`).
+//
+// WHY ASYNC: better-sqlite3 is synchronous; node-postgres is async. Every query
+// helper below returns a Promise, so route handlers must be converted from
+//   db.prepare(...).get/all/run(...)         →  await db.get/all/run(...)
+// The helper layer keeps the SQL text identical by converting:
+//   "?" placeholders  → $1, $2, …          (toPgSql)
+//   datetime('now')   → now()              (used by the chat router)
+//   INSERT …          → INSERT … RETURNING id  (emulates lastInsertRowid)
+//
+// SETUP (see also supabase/schema.sql and .env.example):
+//   1. npm install pg
+//   2. Supabase → Project Settings → Database → Connection string (pooler)
+//   3. .env:  SUPABASE_DB_URL=postgresql://postgres.XXXX:[PASSWORD]@aws-0-<region>.pooler.supabase.com:5432/postgres
+//   4. Run supabase/schema.sql once in the Supabase SQL Editor (or set
+//      SUPABASE_AUTO_MIGRATE=1 to have initDatabase() apply it for you).
+// ============================================================================
+
+import bcrypt from 'bcryptjs';
+import pg from 'pg';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export const connectionString =
+  process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
+
+if (!connectionString) {
+  console.warn(
+    '[db.supabase] Missing SUPABASE_DB_URL / DATABASE_URL. ' +
+      'Add it to .env (see .env.example) before starting the server.'
+  );
+}
+
+export const pool = new pg.Pool({
+  connectionString,
+  max: 10,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 10_000,
+  // Supabase's connection-pooler uses a proxy cert, so rejectUnauthorized:false.
+  // Use SUPABASE_SSL=false only for local/trusted network direct connections.
+  ssl: process.env.SUPABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
+});
+
+// node-postgres returns COUNT(*)/BIGINT ids as strings by default; this app
+// treats ids/counts as numbers everywhere, so parse INT8 → Number. (Safe here:
+// ids stay far below Number.MAX_SAFE_INTEGER.)
+pg.types.setTypeParser(pg.types.builtins.INT8, v => (v === null ? null : parseInt(v, 10)));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SQLite → PostgreSQL statement converter
+// ─────────────────────────────────────────────────────────────────────────────
+export function toPgSql(sql) {
+  let i = 1;
+  return String(sql)
+    // SQLite's datetime('now') util function → PG now()::text (returns text)
+    .replace(/datetime\s*\(\s*'now'\s*\)/gi, "now()::text")
+    // "?" positional placeholders → $1, $2, … (in order of appearance)
+    .replace(/\?/g, () => `$${i++}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Query helpers (all async)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Row "camelizer" — Postgres folds unquoted identifiers to lowercase, so a
+// column declared as `fullName` arrives as `fullname` in result rows. The Node
+// app reads those as camelCase properties (row.fullName, row.studentId, …).
+// camelizeRow() maps every lowercase column back to its camelCase JS key so the
+// rest of the (backend + frontend) code works unchanged, exactly like SQLite.
+// Single-word columns (id, name, status, role, …) are already correct.
+// NOTE: chat_messages.userName becomes `username` in Postgres → mapped to
+// `userName`; users.username is a single word and should STAY `username`.
+// ─────────────────────────────────────────────────────────────────────────────
+const CAMEL_OVERRIDES = {
+  fullname: 'fullName',
+  classname: 'className',
+  registrationdate: 'registrationDate',
+  linkedstudentid: 'linkedStudentId',
+  crforclass: 'crForClass',
+  manageallclasses: 'manageAllClasses',
+  linkedteacherid: 'linkedTeacherId',
+  rollno: 'rollNo',
+  dateofbirth: 'dateOfBirth',
+  admissiondate: 'admissionDate',
+  iscr: 'isCR',
+  linkeduserid: 'linkedUserId',
+  joiningdate: 'joiningDate',
+  studentid: 'studentId',
+  studentname: 'studentName',
+  examtype: 'examType',
+  photourl: 'photoUrl',
+  photomime: 'photoMime',
+  cardstatus: 'cardStatus',
+  reviewnote: 'reviewNote',
+  reviewedby: 'reviewedBy',
+  issuedat: 'issuedAt',
+  updatedat: 'updatedAt',
+  teachername: 'teacherName',
+  userid: 'userId',
+  // NOTE: `username` is intentionally NOT mapped to `userName` here — users.username
+  // must stay `username`. chat_messages.userName is disambiguated via explicit
+  // quoted SQL aliases in chat.js (see SELECT .. AS "userName").
+  userrole: 'userRole',
+  createdat: 'createdAt',
+  createdby: 'createdBy',
+  periodindex: 'periodIndex',
+  markedat: 'markedAt',
+  scheduleddate: 'scheduledDate',
+  distancefromcenter: 'distanceFromCenter',
+  approvedby: 'approvedBy',
+  approvedat: 'approvedAt',
+  cardid: 'cardId',
+};
+
+function camelizeRow(row) {
+  if (!row || typeof row !== 'object') return row;
+  const out = {};
+  for (const [k, v] of Object.entries(row)) {
+    const lk = k.toLowerCase();
+    out[CAMEL_OVERRIDES[lk] || k] = v;
+  }
+  return out;
+}
+
+const camelizeRows = rows => (Array.isArray(rows) ? rows.map(camelizeRow) : rows);
+
+/** Low-level query — returns the full pg result ({ rows, rowCount, … }). */
+export async function query(text, params = []) {
+  const res = await pool.query(toPgSql(text), params);
+  res.rows = camelizeRows(res.rows);
+  return res;
+}
+
+/** All rows as an array of plain objects. */
+export async function all(text, params = []) {
+  const res = await pool.query(toPgSql(text), params);
+  return camelizeRows(res.rows);
+}
+
+/** First row or undefined (same as better-sqlite3's stmt.get()). */
+export async function get(text, params = []) {
+  const res = await pool.query(toPgSql(text), params);
+  return camelizeRow(res.rows[0]);
+}
+
+/** Execute INSERT/UPDATE/DELETE — returns { changes, lastInsertRowid }.
+ *  INSERTs get " RETURNING id" so lastInsertRowid works like in SQLite. */
+export async function run(text, params = []) {
+  const trimmed = String(text).trim().replace(/;\s*$/, '');
+  const sql = toPgSql(trimmed);
+  const isInsert = /^\s*insert\b/i.test(sql);
+  const hasReturning = /\breturning\b/i.test(sql);
+  const finalSql = isInsert && !hasReturning ? `${sql} RETURNING id` : sql;
+  const res = await pool.query(finalSql, params);
+  const rows = res.rows || [];
+  return {
+    changes: res.rowCount ?? 0,
+    lastInsertRowid: isInsert && rows.length ? Number(rows[rows.length - 1].id) : 0,
+  };
+}
+
+/** Run one or more ;-separated statements (DDL / deletes, no params). */
+export async function exec(text) {
+  const statements = String(text)
+    .split(/;\s*\n/)
+    .map(s => s.trim())
+    .filter(Boolean);
+  for (const stmt of statements) {
+    await pool.query(stmt);
+  }
+  return { changes: statements.length };
+}
+/**
+ * Async transaction wrapper.
+ *   const bulkInsert = db.transaction(async ({ run, get }) => {
+ *     await run('INSERT INTO students (...) VALUES (?, …)', values);
+ *     return get('SELECT * FROM students WHERE id = ?', [id]);
+ *   });
+ *   const inserted = await bulkInsert();
+ * Callbacks receive a bound helper ({ query, all, get, run }) that executes on
+ * the SAME connection, so all queries share one transaction (BEGIN/COMMIT).
+ */
+export function transaction(fn) {
+  return async (...args) => {
+    const client = await pool.connect();
+    const bind = {
+      query: (s, p = []) => client.query(toPgSql(s), p).then(r => { r.rows = camelizeRows(r.rows); return r; }),
+      all: async (s, p = []) => camelizeRows((await client.query(toPgSql(s), p)).rows),
+      get: async (s, p = []) => camelizeRow((await client.query(toPgSql(s), p)).rows[0]),
+      run: async (s, p = []) => {
+        const trimmed = String(s).trim().replace(/;\s*$/, '');
+        const sql = toPgSql(trimmed);
+        const isInsert = /^\s*insert\b/i.test(sql);
+        const hasReturning = /\breturning\b/i.test(sql);
+        const finalSql = isInsert && !hasReturning ? `${sql} RETURNING id` : sql;
+        const res = await client.query(finalSql, p);
+        const rows = res.rows || [];
+        return {
+          changes: res.rowCount ?? 0,
+          lastInsertRowid: isInsert && rows.length ? Number(rows[rows.length - 1].id) : 0,
+        };
+      },
+    };
+    try {
+      await client.query('BEGIN');
+      const value = await fn(bind, ...args);
+      await client.query('COMMIT');
+      return value;
+    } catch (err) {
+      try { await client.query('ROLLBACK'); } catch { /* already broken */ }
+      throw err;
+    } finally {
+      client.release();
+    }
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Schema bootstrapping — applies supabase/schema.sql (idempotent)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function initDatabase() {
+  // Recommended: run supabase/schema.sql once in the Supabase SQL Editor.
+  // For auto-migrate on boot, set SUPABASE_AUTO_MIGRATE=1.
+  if (process.env.SUPABASE_AUTO_MIGRATE !== '1') {
+    console.log('[db.supabase] Skipping auto-migrate (set SUPABASE_AUTO_MIGRATE=1 to enable).');
+    return;
+  }
+  const schemaPath = path.join(__dirname, '..', 'supabase', 'schema.sql');
+  if (!fs.existsSync(schemaPath)) {
+    console.warn('[db.supabase] supabase/schema.sql not found — run the schema manually in the SQL Editor.');
+    return;
+  }
+  console.log('[db.supabase] Applying supabase/schema.sql …');
+  await exec(fs.readFileSync(schemaPath, 'utf8'));
+  console.log('[db.supabase] Schema ready.');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Seeding — port of db.js seedDatabase() using the async helpers above.
+// Seeds only when the users table is empty (same guard as the SQLite version).
+// ─────────────────────────────────────────────────────────────────────────────
+export async function seedDatabase() {
+  const cnt = (await get('SELECT COUNT(*) AS c FROM users')).c;
+  if (cnt > 0) return;
+  const h = pw => bcrypt.hashSync(pw, 10);
+  const now = new Date().toISOString().slice(0, 10);
+
+  const iU = 'INSERT INTO users (username,email,password,fullName,role,status,className,registrationDate) VALUES (?,?,?,?,?,?,?,?)';
+  await run(iU, ['admin', 'admin@ncba.edu.pk', h('admin123'), 'System Administrator', 'super_admin', 'approved', null, now]);
+  await run(iU, ['cr.admin', 'cr@ncba.edu.pk', h('cr123'), 'Class Representative', 'cr_admin', 'approved', 'BSCS', now]);
+  await run(iU, ['teacher.admin', 'teacher@ncba.edu.pk', h('teacher123'), 'Professor Admin', 'teacher_admin', 'approved', null, now]);
+  await run(iU, ['ahmed.khan', 'ahmed.khan@ncba.edu.pk', h('student123'), 'Ahmed Khan', 'student', 'pending', 'BSCS', now]);
+
+  await seedStudents();
+  await seedTeachers();
+  await seedSubjects();
+  await seedClasses();
+  await seedMarks();
+  await seedClassSchedules();
+  await seedAttendanceRecords();
+  console.log('Database seeded (Supabase)');
+}
+
+async function seedStudents() {
+  const iS = 'INSERT INTO students (name,email,phone,rollNo,className,gender,address,dateOfBirth,admissionDate,status,isCR) VALUES (?,?,?,?,?,?,?,?,?,?,?)';
+  const rows = [
+    ['Ahmed Khan', 'ahmed.khan@school.edu', '+91 98765 43210', 'STU-001', 'BSCS', 'Male', '12 Main St Mumbai', '2009-05-15', '2020-06-01', 'Active', 1],
+    ['Priya Sharma', 'priya.sharma@school.edu', '+91 91234 56789', 'STU-002', 'BSCS', 'Female', '45 Park Ave Delhi', '2009-08-22', '2020-06-01', 'Active', 0],
+    ['Rahul Verma', 'rahul.verma@school.edu', '+91 99887 76655', 'STU-003', 'BSIT', 'Male', '78 Lake View Bangalore', '2009-01-10', '2020-06-01', 'Active', 1],
+    ['Sneha Patel', 'sneha.patel@school.edu', '+91 98776 55443', 'STU-004', 'BSIT', 'Female', '234 River St Ahmedabad', '2008-12-05', '2020-06-01', 'Active', 0],
+    ['Arjun Singh', 'arjun.singh@school.edu', '+91 96543 21098', 'STU-005', 'BBA', 'Male', '56 Hill View Jaipur', '2010-03-18', '2021-06-01', 'Active', 1],
+    ['Fatima Sheikh', 'fatima.sheikh@school.edu', '+91 90099 88776', 'STU-006', 'BBA', 'Female', '89 Rose Garden Hyderabad', '2010-07-30', '2021-06-01', 'Active', 0],
+    ['Vikram Mehta', 'vikram.mehta@school.edu', '+91 87654 32109', 'STU-007', 'BSAF', 'Male', '123 Green Park Pune', '2009-11-25', '2021-06-01', 'Inactive', 1],
+    ['Ananya Gupta', 'ananya.gupta@school.edu', '+91 94455 66778', 'STU-008', 'BSCS', 'Female', '678 Sunny St Lucknow', '2009-04-12', '2020-06-01', 'Active', 0],
+    ['Rohan Joshi', 'rohan.joshi@school.edu', '+91 93322 11009', 'STU-009', 'BSIT', 'Male', '34 Mountain View Nashik', '2008-09-08', '2020-06-01', 'Active', 0],
+    ['Kavya Nair', 'kavya.nair@school.edu', '+91 91122 33445', 'STU-010', 'BSAF', 'Female', '567 Marine Drive Kochi', '2010-02-20', '2021-06-01', 'Active', 0],
+  ];
+  for (const r of rows) await run(iS, r);
+}
+
+async function seedTeachers() {
+  const iT = 'INSERT INTO teachers (name,email,phone,subject,qualification,experience,className,joiningDate) VALUES (?,?,?,?,?,?,?,?)';
+  const rows = [
+    ['Dr. Rajesh Kumar', 'rajesh.kumar@school.edu', '+91 98765 43211', 'Mathematics', 'Ph.D. Mathematics', '15 years', 'BSCS', '2018-06-01'],
+    ['Prof. Sneha Iyer', 'sneha.iyer@school.edu', '+91 98765 43212', 'Physics', 'M.Sc. Physics', '10 years', 'BSIT', '2019-01-15'],
+    ['Dr. Amit Patel', 'amit.patel@school.edu', '+91 98765 43213', 'Chemistry', 'Ph.D. Chemistry', '12 years', 'BBA', '2018-08-01'],
+    ['Ms. Priya Desai', 'priya.desai@school.edu', '+91 98765 43214', 'English', 'M.A. English', '8 years', 'BSCS', '2020-01-10'],
+    ['Mr. Vikram Singh', 'vikram.singh@school.edu', '+91 98765 43215', 'Computer Science', 'M.Tech CS', '6 years', 'BSIT', '2021-06-01'],
+    ['Dr. Neha Sharma', 'neha.sharma@school.edu', '+91 98765 43216', 'Biology', 'Ph.D. Biology', '9 years', 'BSAF', '2019-08-15'],
+  ];
+  for (const r of rows) await run(iT, r);
+}
+
+async function seedSubjects() {
+  const iSub = 'INSERT INTO subjects (name,code,teacher,credits,className) VALUES (?,?,?,?,?)';
+  const rows = [
+    ['Mathematics', 'MATH-101', 'Dr. Rajesh Kumar', 4, 'BSCS'],
+    ['Physics', 'PHY-101', 'Prof. Sneha Iyer', 4, 'BSCS'],
+    ['Chemistry', 'CHEM-101', 'Dr. Amit Patel', 3, 'BSCS'],
+    ['English', 'ENG-101', 'Ms. Priya Desai', 3, 'BSCS'],
+    ['Computer Science', 'CS-101', 'Mr. Vikram Singh', 4, 'BSIT'],
+    ['Biology', 'BIO-101', 'Dr. Neha Sharma', 3, 'BSAF'],
+  ];
+  for (const r of rows) await run(iSub, r);
+}
+
+async function seedClasses() {
+  const iC = 'INSERT INTO classes (name,code,description,semester) VALUES (?,?,?,?)';
+  const rows = [
+    ['BSCS', 'BSCS', 'Bachelor of Science in Computer Science', '3rd'],
+    ['BSIT', 'BSIT', 'Bachelor of Science in Information Technology', '3rd'],
+    ['BBA', 'BBA', 'Bachelor of Business Administration', '2nd'],
+    ['BSAF', 'BSAF', 'Bachelor of Science in Accounting & Finance', '3rd'],
+  ];
+  for (const r of rows) await run(iC, r);
+}
+
+async function seedMarks() {
+  const iM = 'INSERT INTO marks (studentId,studentName,subject,marks,grade,examType) VALUES (?,?,?,?,?,?)';
+  const rows = [
+    [1, 'Ahmed Khan', 'Mathematics', 92, 'A+', 'Final'],
+    [1, 'Ahmed Khan', 'Physics', 88, 'A', 'Final'],
+    [1, 'Ahmed Khan', 'Chemistry', 95, 'A+', 'Final'],
+    [2, 'Priya Sharma', 'Mathematics', 90, 'A+', 'Final'],
+    [2, 'Priya Sharma', 'Physics', 85, 'A', 'Final'],
+    [2, 'Priya Sharma', 'Chemistry', 92, 'A+', 'Final'],
+    [3, 'Rahul Verma', 'Mathematics', 85, 'A', 'Final'],
+    [3, 'Rahul Verma', 'Physics', 78, 'B+', 'Final'],
+    [3, 'Rahul Verma', 'Chemistry', 80, 'A-', 'Final'],
+    [4, 'Sneha Patel', 'Mathematics', 88, 'A', 'Final'],
+    [4, 'Sneha Patel', 'Physics', 82, 'A-', 'Final'],
+    [4, 'Sneha Patel', 'Chemistry', 86, 'A', 'Final'],
+    [5, 'Arjun Singh', 'Biology', 91, 'A+', 'Midterm'],
+    [5, 'Arjun Singh', 'English', 84, 'A', 'Midterm'],
+    [5, 'Arjun Singh', 'Computer Science', 90, 'A+', 'Midterm'],
+    [6, 'Fatima Sheikh', 'Biology', 93, 'A+', 'Midterm'],
+    [6, 'Fatima Sheikh', 'English', 87, 'A', 'Midterm'],
+    [6, 'Fatima Sheikh', 'Computer Science', 94, 'A+', 'Midterm'],
+    [7, 'Vikram Mehta', 'Biology', 72, 'B', 'Midterm'],
+    [7, 'Vikram Mehta', 'English', 75, 'B+', 'Midterm'],
+    [7, 'Vikram Mehta', 'Computer Science', 68, 'B-', 'Midterm'],
+    [8, 'Ananya Gupta', 'Mathematics', 89, 'A', 'Final'],
+    [8, 'Ananya Gupta', 'Physics', 93, 'A+', 'Final'],
+    [8, 'Ananya Gupta', 'Chemistry', 87, 'A', 'Final'],
+    [9, 'Rohan Joshi', 'Mathematics', 76, 'B+', 'Final'],
+    [9, 'Rohan Joshi', 'Physics', 70, 'B', 'Final'],
+    [9, 'Rohan Joshi', 'Chemistry', 74, 'B+', 'Final'],
+    [10, 'Kavya Nair', 'Biology', 86, 'A', 'Midterm'],
+    [10, 'Kavya Nair', 'English', 92, 'A+', 'Midterm'],
+    [10, 'Kavya Nair', 'Computer Science', 83, 'A-', 'Midterm'],
+  ];
+  for (const r of rows) await run(iM, r);
+}
+
+async function seedClassSchedules() {
+  const existing = (await get('SELECT COUNT(*) AS c FROM class_schedules')).c;
+  if (existing > 0) return;
+  const classNames = (await all('SELECT name FROM classes')).map(r => r.name);
+  if (classNames.length === 0) return;
+  const defaultStructure = JSON.stringify({
+    days: [
+      { name: 'Friday', periods: ['08:00 - 09:30'] },
+      { name: 'Saturday', periods: ['08:00 - 09:30', '09:30 - 11:00', '11:00 - 12:30'] },
+      { name: 'Sunday', periods: ['08:00 - 09:30', '09:30 - 11:00', '11:00 - 12:30'] },
+    ],
+  });
+  const iS = 'INSERT INTO class_schedules (className, structure, slots) VALUES (?, ?, ?)';
+  for (const cls of classNames) await run(iS, [cls, defaultStructure, '{}']);
+}
+
+async function seedAttendanceRecords() {
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const iso = d =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const students = await all("SELECT id, name, className FROM students WHERE status = 'Active'");
+  if (students.length === 0) return;
+  const recentDays = [];
+  const now = new Date();
+  for (let i = 6; i >= 1; i--) recentDays.push(new Date(now.getTime() - i * 86400000));
+  const statuses = ['approved', 'approved', 'rejected', 'approved', 'pending', 'late', 'approved'];
+  const iA = 'INSERT INTO attendance_records (className, subject, day, periodIndex, studentId, studentName, status, presence, markedAt, scheduledDate, createdAt) VALUES (?,?,?,?,?,?,?,?,?,?,?)';
+  for (let si = 0; si < students.length; si++) {
+    const s = students[si];
+    for (const d of recentDays) {
+      for (const periodIndex of [0, 2]) {
+        const hash = (si * 7 + recentDays.indexOf(d) + periodIndex) % statuses.length;
+        const presence = statuses[hash] === 'late' ? 'late' : 'present';
+        await run(iA, [s.className, 'General', dayNames[d.getDay()], periodIndex, s.id, s.name, statuses[hash], presence, '08:30', iso(d), d.toISOString()]);
+      }
+    }
+  }
+}
+
+// Convenience facade mirroring server/db.js's default export shape.
+//   import db from './db.supabase.js';
+//   await db.initDatabase(); await db.seedDatabase();
+//   const rows = await db.all('SELECT * FROM students');
+//   const row  = await db.get('SELECT * FROM students WHERE id = ?', [id]);
+//   const r    = await db.run('INSERT INTO students (...) VALUES (?, …)', values);
+//   const tx   = db.transaction(async ({ run, get }) => { … });
+// ─────────────────────────────────────────────────────────────────────────────
+export default {
+  pool,
+  connectionString,
+  query,
+  all,
+  get,
+  run,
+  exec,
+  transaction,
+  initDatabase,
+  seedDatabase,
+  // Named exports remain importable too:
+};

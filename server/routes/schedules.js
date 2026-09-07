@@ -14,9 +14,9 @@ const DEFAULT_STRUCTURE = JSON.stringify({
 });
 
 // GET all schedules
-router.get('/', requirePermission('view_class_schedule'), (req, res) => {
+router.get('/', requirePermission('view_class_schedule'), async (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM class_schedules ORDER BY id').all();
+    const rows = await db.all('SELECT * FROM class_schedules ORDER BY id');
     const schedules = rows.map(r => ({
       id: r.id,
       className: r.className,
@@ -30,15 +30,15 @@ router.get('/', requirePermission('view_class_schedule'), (req, res) => {
 });
 
 // GET schedule for a specific class
-router.get('/:className', requirePermission('view_class_schedule'), (req, res) => {
+router.get('/:className', requirePermission('view_class_schedule'), async (req, res) => {
   try {
     const className = req.params.className;
-    let row = db.prepare('SELECT * FROM class_schedules WHERE className = ?').get(className);
+    let row = await db.get('SELECT * FROM class_schedules WHERE className = ?', [className]);
     if (!row) {
       // Auto-create with default structure for new classes
-      db.prepare('INSERT INTO class_schedules (className, structure, slots) VALUES (?, ?, ?)')
-        .run(className, DEFAULT_STRUCTURE, '{}');
-      row = db.prepare('SELECT * FROM class_schedules WHERE className = ?').get(className);
+      await db.run('INSERT INTO class_schedules (className, structure, slots) VALUES (?, ?, ?)',
+        [className, DEFAULT_STRUCTURE, '{}']);
+      row = await db.get('SELECT * FROM class_schedules WHERE className = ?', [className]);
     }
     res.json({
       id: row.id,
@@ -52,7 +52,7 @@ router.get('/:className', requirePermission('view_class_schedule'), (req, res) =
 });
 
 // PUT (save/update) schedule for a specific class
-router.put('/:className', requirePermission('edit_class_schedule'), (req, res) => {
+router.put('/:className', requirePermission('edit_class_schedule'), async (req, res) => {
   try {
     const className = req.params.className;
     const { structure, slots } = req.body;
@@ -60,16 +60,16 @@ router.put('/:className', requirePermission('edit_class_schedule'), (req, res) =
     const structureStr = JSON.stringify(structure || { days: [] });
     const slotsStr = JSON.stringify(slots || {});
 
-    const existing = db.prepare('SELECT id FROM class_schedules WHERE className = ?').get(className);
+    const existing = await db.get('SELECT id FROM class_schedules WHERE className = ?', [className]);
     if (existing) {
-      db.prepare('UPDATE class_schedules SET structure = ?, slots = ? WHERE className = ?')
-        .run(structureStr, slotsStr, className);
+      await db.run('UPDATE class_schedules SET structure = ?, slots = ? WHERE className = ?',
+        [structureStr, slotsStr, className]);
     } else {
-      db.prepare('INSERT INTO class_schedules (className, structure, slots) VALUES (?, ?, ?)')
-        .run(className, structureStr, slotsStr);
+      await db.run('INSERT INTO class_schedules (className, structure, slots) VALUES (?, ?, ?)',
+        [className, structureStr, slotsStr]);
     }
 
-    const row = db.prepare('SELECT * FROM class_schedules WHERE className = ?').get(className);
+    const row = await db.get('SELECT * FROM class_schedules WHERE className = ?', [className]);
     res.json({
       id: row.id,
       className: row.className,
@@ -82,9 +82,9 @@ router.put('/:className', requirePermission('edit_class_schedule'), (req, res) =
 });
 
 // DELETE schedule for a specific class
-router.delete('/:className', requirePermission('edit_class_schedule'), (req, res) => {
+router.delete('/:className', requirePermission('edit_class_schedule'), async (req, res) => {
   try {
-    db.prepare('DELETE FROM class_schedules WHERE className = ?').run(req.params.className);
+    await db.run('DELETE FROM class_schedules WHERE className = ?', [req.params.className]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

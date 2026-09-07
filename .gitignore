@@ -7,3 +7,12 @@ database.sqlite-*
 
 # Local dev certificates (mkcert)
 .certs/
+
+# Environment variables (secrets) — never commit
+.env
+.env.local
+.env.*.local
+
+# Locally uploaded card photos (persistent only in dev)
+uploads/
+

@@ -31,12 +31,14 @@ router.get('/stream', requirePermission('use_chat'), (req, res) => {
 });
 
 // ── Get messages for a channel ──────────────────────────────────────────
-router.get('/messages/:channel', requirePermission('use_chat'), (req, res) => {
+router.get('/messages/:channel', requirePermission('use_chat'), async (req, res) => {
   const { channel } = req.params;
   const limit = Math.min(parseInt(req.query.limit) || 100, 500);
   const before = req.query.before; // ISO datetime for pagination
 
-  let sql = 'SELECT * FROM chat_messages WHERE channel = ?';
+  let sql = `SELECT id, userid AS "userId", username AS "userName", userrole AS "userRole",
+             channel, message, createdat AS "createdAt"
+             FROM chat_messages WHERE channel = ?`;
   const params = [channel];
 
   if (before) {
@@ -48,7 +50,7 @@ router.get('/messages/:channel', requirePermission('use_chat'), (req, res) => {
   params.push(limit);
 
   try {
-    const messages = db.prepare(sql).all(...params).reverse();
+    const messages = (await db.all(sql, params)).reverse();
     res.json({ messages });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -56,7 +58,7 @@ router.get('/messages/:channel', requirePermission('use_chat'), (req, res) => {
 });
 
 // ── Send a message ──────────────────────────────────────────────────────
-router.post('/messages', requirePermission('use_chat'), (req, res) => {
+router.post('/messages', requirePermission('use_chat'), async (req, res) => {
   const { channel, message } = req.body;
   const userId = req.user.id;
   const userRole = req.user.role;
@@ -74,19 +76,19 @@ router.post('/messages', requirePermission('use_chat'), (req, res) => {
   }
 
   // Announcements require the 'post_announcements' permission (User Rights page)
-  if (channel === 'announcements' && !userHasRight(userId, userRole, 'post_announcements')) {
+  if (channel === 'announcements' && !(await userHasRight(userId, userRole, 'post_announcements'))) {
     return res.status(403).json({ error: 'Only users with the Post Announcements permission can post announcements' });
   }
 
   // Look up user's fullName from DB (JWT doesn't include it)
-  const userRow = db.prepare('SELECT fullName FROM users WHERE id = ?').get(userId);
+  const userRow = await db.get('SELECT fullName FROM users WHERE id = ?', [userId]);
   const userName = userRow ? userRow.fullName : req.user.username;
 
   try {
-    const stmt = db.prepare(
-      'INSERT INTO chat_messages (userId, userName, userRole, channel, message, createdAt) VALUES (?, ?, ?, ?, ?, datetime(\'now\'))'
+    const result = await db.run(
+      'INSERT INTO chat_messages (userId, userName, userRole, channel, message, createdAt) VALUES (?, ?, ?, ?, ?, datetime(\'now\'))',
+      [userId, userName, userRole, channel, message.trim()]
     );
-    const result = stmt.run(userId, userName, userRole, channel, message.trim());
 
     const newMsg = {
       id: result.lastInsertRowid,
@@ -109,7 +111,7 @@ router.post('/messages', requirePermission('use_chat'), (req, res) => {
 });
 
 // ── Delete a message (admin only) ───────────────────────────────────────
-router.delete('/messages/:id', requirePermission('use_chat'), (req, res) => {
+router.delete('/messages/:id', requirePermission('use_chat'), async (req, res) => {
   const { id } = req.params;
   const userRole = req.user.role;
 
@@ -118,10 +120,10 @@ router.delete('/messages/:id', requirePermission('use_chat'), (req, res) => {
   }
 
   try {
-    const msg = db.prepare('SELECT * FROM chat_messages WHERE id = ?').get(id);
+    const msg = await db.get('SELECT * FROM chat_messages WHERE id = ?', [id]);
     if (!msg) return res.status(404).json({ error: 'Message not found' });
 
-    db.prepare('DELETE FROM chat_messages WHERE id = ?').run(id);
+    await db.run('DELETE FROM chat_messages WHERE id = ?', [id]);
 
     broadcast('delete-message', { id: Number(id), channel: msg.channel });
 

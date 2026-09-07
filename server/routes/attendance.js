@@ -20,7 +20,7 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
 // is stored separately from the approval status; both are set to 'absent' so
 // these are final (not pending approval) and don't clutter the review queue.
 // Returns a count of how many absent records were created.
-function ensureAbsentRecords(className, date) {
+async function ensureAbsentRecords(className, date) {
   if (!className || !date) return 0;
   // Never auto-mark students absent for a future date (period could still be open)
   const todayIso = (() => {
@@ -31,7 +31,7 @@ function ensureAbsentRecords(className, date) {
   // Deterministic weekday name (locale-independent)
   const valid = new Date(date + 'T00:00:00');
   const dayName = Number.isNaN(valid.getTime()) ? '' : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][valid.getDay()];
-  const schedule = db.prepare('SELECT structure FROM class_schedules WHERE className = ?').get(className);
+  const schedule = await db.get('SELECT structure FROM class_schedules WHERE className = ?', [className]);
   let periods = [];
   if (schedule) {
     try {
@@ -42,15 +42,17 @@ function ensureAbsentRecords(className, date) {
   }
   if (periods.length === 0) return 0;
 
-  const students = db.prepare(
-    "SELECT id, name FROM students WHERE className = ? AND status = 'Active'"
-  ).all(className);
+  const students = await db.all(
+    "SELECT id, name FROM students WHERE className = ? AND status = 'Active'",
+    [className]
+  );
 
   // Already-existing (studentId, periodIndex) pairs for this class/date
   const existingKeys = new Set(
-    db.prepare(
-      "SELECT studentId || '|' || periodIndex AS k FROM attendance_records WHERE className = ? AND scheduledDate = ?"
-    ).all(className, date).map(r => r.k)
+    (await db.all(
+      "SELECT studentId || '|' || periodIndex AS k FROM attendance_records WHERE className = ? AND scheduledDate = ?",
+      [className, date]
+    )).map(r => r.k)
   );
 
   const now = new Date().toISOString();
@@ -59,15 +61,13 @@ function ensureAbsentRecords(className, date) {
     const m = /-\s*(\d{1,2}):(\d{2})/.exec(timeRange || '');
     return m ? `${m[1].padStart(2, '0')}:${m[2]}` : '23:59';
   };
-  const insert = db.prepare(
-    'INSERT INTO attendance_records (className, subject, day, periodIndex, studentId, studentName, status, presence, markedAt, scheduledDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  );
-  const createAbsent = db.transaction(() => {
+  const createAbsent = db.transaction(async ({ run }) => {
     let created = 0;
     for (let pi = 0; pi < periods.length; pi++) {
       for (const s of students) {
         if (existingKeys.has(`${s.id}|${pi}`)) continue;
-        insert.run(className, null, dayName, pi, s.id, s.name, 'absent', 'absent', periodMarkedAt(periods[pi]), date, now);
+        await run('INSERT INTO attendance_records (className, subject, day, periodIndex, studentId, studentName, status, presence, markedAt, scheduledDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [className, null, dayName, pi, s.id, s.name, 'absent', 'absent', periodMarkedAt(periods[pi]), date, now]);
         created++;
       }
     }
@@ -77,55 +77,55 @@ function ensureAbsentRecords(className, date) {
 }
 
 // ── Geofence CRUD ──
-router.get('/geofences', requirePermission('manage_geofences'), (req, res) => {
+router.get('/geofences', requirePermission('manage_geofences'), async (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM attendance_geofences ORDER BY id DESC').all();
+    const rows = await db.all('SELECT * FROM attendance_geofences ORDER BY id DESC');
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.get('/geofences/:className', requirePermission('view_attendance'), (req, res) => {
+router.get('/geofences/:className', requirePermission('view_attendance'), async (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM attendance_geofences WHERE className = ? OR className IS NULL ORDER BY id DESC').all(req.params.className);
+    const rows = await db.all('SELECT * FROM attendance_geofences WHERE className = ? OR className IS NULL ORDER BY id DESC', [req.params.className]);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/geofences', requirePermission('manage_geofences'), (req, res) => {
+router.post('/geofences', requirePermission('manage_geofences'), async (req, res) => {
   try {
     const { name, country, province, city, latitude, longitude, radius, className } = req.body;
     if (!name || latitude == null || longitude == null) {
       return res.status(400).json({ error: 'Name, latitude, and longitude are required' });
     }
     const now = new Date().toISOString();
-    const result = db.prepare('INSERT INTO attendance_geofences (name, country, province, city, latitude, longitude, radius, className, createdBy, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(name, country || null, province || null, city || null, latitude, longitude, radius || 100, className || null, req.user.username, now);
-    const geofence = db.prepare('SELECT * FROM attendance_geofences WHERE id = ?').get(result.lastInsertRowid);
+    const result = await db.run('INSERT INTO attendance_geofences (name, country, province, city, latitude, longitude, radius, className, createdBy, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, country || null, province || null, city || null, latitude, longitude, radius || 100, className || null, req.user.username, now]);
+    const geofence = await db.get('SELECT * FROM attendance_geofences WHERE id = ?', [result.lastInsertRowid]);
     res.json(geofence);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.put('/geofences/:id', requirePermission('manage_geofences'), (req, res) => {
+router.put('/geofences/:id', requirePermission('manage_geofences'), async (req, res) => {
   try {
     const { name, country, province, city, latitude, longitude, radius, className } = req.body;
-    const existing = db.prepare('SELECT * FROM attendance_geofences WHERE id = ?').get(req.params.id);
+    const existing = await db.get('SELECT * FROM attendance_geofences WHERE id = ?', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Geofence not found' });
-    db.prepare('UPDATE attendance_geofences SET name = ?, country = ?, province = ?, city = ?, latitude = ?, longitude = ?, radius = ?, className = ? WHERE id = ?')
-      .run(name || existing.name, country !== undefined ? (country || null) : existing.country, province !== undefined ? (province || null) : existing.province, city !== undefined ? (city || null) : existing.city, latitude ?? existing.latitude, longitude ?? existing.longitude, radius ?? existing.radius, className !== undefined ? (className || null) : existing.className, req.params.id);
-    const updated = db.prepare('SELECT * FROM attendance_geofences WHERE id = ?').get(req.params.id);
+    await db.run('UPDATE attendance_geofences SET name = ?, country = ?, province = ?, city = ?, latitude = ?, longitude = ?, radius = ?, className = ? WHERE id = ?',
+      [name || existing.name, country !== undefined ? (country || null) : existing.country, province !== undefined ? (province || null) : existing.province, city !== undefined ? (city || null) : existing.city, latitude ?? existing.latitude, longitude ?? existing.longitude, radius ?? existing.radius, className !== undefined ? (className || null) : existing.className, req.params.id]);
+    const updated = await db.get('SELECT * FROM attendance_geofences WHERE id = ?', [req.params.id]);
     res.json(updated);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.delete('/geofences/:id', requirePermission('manage_geofences'), (req, res) => {
+router.delete('/geofences/:id', requirePermission('manage_geofences'), async (req, res) => {
   try {
-    db.prepare('DELETE FROM attendance_geofences WHERE id = ?').run(req.params.id);
+    await db.run('DELETE FROM attendance_geofences WHERE id = ?', [req.params.id]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Mark Attendance (Student) ──
-router.post('/mark', requirePermission('mark_attendance'), (req, res) => {
+router.post('/mark', requirePermission('mark_attendance'), async (req, res) => {
   try {
     const { className, subject, day, periodIndex, scheduledDate, latitude, longitude } = req.body;
     if (!className || !day || periodIndex == null || !scheduledDate) {
@@ -136,13 +136,13 @@ router.post('/mark', requirePermission('mark_attendance'), (req, res) => {
     // link (`linkedStudentId`); fall back to the reverse lookup on students.
     const userRow = req.user.linkedStudentId != null
       ? req.user
-      : db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+      : await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
     let student = null;
     if (userRow && userRow.linkedStudentId != null) {
-      student = db.prepare('SELECT id, name FROM students WHERE id = ?').get(userRow.linkedStudentId);
+      student = await db.get('SELECT id, name FROM students WHERE id = ?', [userRow.linkedStudentId]);
     }
     if (!student) {
-      student = db.prepare('SELECT id, name FROM students WHERE linkedUserId = ?').get(req.user.id);
+      student = await db.get('SELECT id, name FROM students WHERE linkedUserId = ?', [req.user.id]);
     }
     if (!student) {
       return res.status(400).json({ error: 'No linked student profile found for this account' });
@@ -151,14 +151,15 @@ router.post('/mark', requirePermission('mark_attendance'), (req, res) => {
     // Check for duplicate — but allow upgrading an auto-generated 'absent' slot
     // so a student who then marks attendance is recorded as present instead of
     // being blocked by the absent placeholder.
-    const existing = db.prepare(
-      'SELECT id, presence FROM attendance_records WHERE studentId = ? AND className = ? AND day = ? AND periodIndex = ? AND scheduledDate = ?'
-    ).get(student.id, className, day, periodIndex, scheduledDate);
+    const existing = await db.get(
+      'SELECT id, presence FROM attendance_records WHERE studentId = ? AND className = ? AND day = ? AND periodIndex = ? AND scheduledDate = ?',
+      [student.id, className, day, periodIndex, scheduledDate]
+    );
 
     // Verify geofence
     let distance = null;
     let geoVerified = false;
-    const geofences = db.prepare('SELECT * FROM attendance_geofences WHERE className = ? OR className IS NULL').all(className);
+    const geofences = await db.all('SELECT * FROM attendance_geofences WHERE className = ? OR className IS NULL', [className]);
     if (geofences.length === 0) {
       geoVerified = true;
     } else if (latitude != null && longitude != null) {
@@ -199,24 +200,26 @@ router.post('/mark', requirePermission('mark_attendance'), (req, res) => {
 
     if (existing) {
       // Upgrade the auto-generated absent placeholder to a real pending mark.
-      db.prepare(
-        "UPDATE attendance_records SET status = ?, presence = 'present', subject = ?, markedAt = ?, latitude = ?, longitude = ?, distanceFromCenter = ?, createdAt = ?, approvedBy = NULL, approvedAt = NULL WHERE id = ?"
-      ).run(status, subjectOrNull, markedTime, latOrNull, lngOrNull, distance, nowISO, existing.id);
-      const record = db.prepare('SELECT * FROM attendance_records WHERE id = ?').get(existing.id);
+      await db.run(
+        "UPDATE attendance_records SET status = ?, presence = 'present', subject = ?, markedAt = ?, latitude = ?, longitude = ?, distanceFromCenter = ?, createdAt = ?, approvedBy = NULL, approvedAt = NULL WHERE id = ?",
+        [status, subjectOrNull, markedTime, latOrNull, lngOrNull, distance, nowISO, existing.id]
+      );
+      const record = await db.get('SELECT * FROM attendance_records WHERE id = ?', [existing.id]);
       return res.json(record);
     }
 
-    const result = db.prepare(
-      'INSERT INTO attendance_records (className, subject, day, periodIndex, studentId, studentName, status, presence, markedAt, scheduledDate, latitude, longitude, distanceFromCenter, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(className, subjectOrNull, day, periodIndex, student.id, student.name, status, 'present', markedTime, scheduledDate, latOrNull, lngOrNull, distance, nowISO);
+    const result = await db.run(
+      'INSERT INTO attendance_records (className, subject, day, periodIndex, studentId, studentName, status, presence, markedAt, scheduledDate, latitude, longitude, distanceFromCenter, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [className, subjectOrNull, day, periodIndex, student.id, student.name, status, 'present', markedTime, scheduledDate, latOrNull, lngOrNull, distance, nowISO]
+    );
 
-    const record = db.prepare('SELECT * FROM attendance_records WHERE id = ?').get(result.lastInsertRowid);
+    const record = await db.get('SELECT * FROM attendance_records WHERE id = ?', [result.lastInsertRowid]);
     res.json(record);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Get attendance records (Admin/CR/Teacher view) ──
-router.get('/records', requirePermission('view_attendance'), (req, res) => {
+router.get('/records', requirePermission('view_attendance'), async (req, res) => {
   try {
     const { className, date, status, presence, search } = req.query;
     // CR and Teacher are locked to the Pending queue in attendance review — only
@@ -227,7 +230,7 @@ router.get('/records', requirePermission('view_attendance'), (req, res) => {
     // If an admin views a specific class on a specific date, materialize any
     // missing 'absent' records (students who were scheduled but never marked).
     if (className && date) {
-      ensureAbsentRecords(className, date);
+      await ensureAbsentRecords(className, date);
     }
     let query = 'SELECT * FROM attendance_records WHERE 1=1';
     const params = [];
@@ -241,20 +244,20 @@ router.get('/records', requirePermission('view_attendance'), (req, res) => {
       params.push(like, like, like, like);
     }
     query += ' ORDER BY createdAt DESC';
-    const rows = db.prepare(query).all(...params);
+    const rows = await db.all(query, params);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // GET attendance records + student info for a specific student (Student Attendance page)
 // Admin/CR/Teacher pick any student; optional from/to date-range filtering.
-router.get('/student-records', requirePermission('view_attendance_report'), (req, res) => {
+router.get('/student-records', requirePermission('view_attendance_report'), async (req, res) => {
   try {
     const { studentId, from, to } = req.query;
     if (!studentId) {
       return res.status(400).json({ error: 'studentId is required' });
     }
-    const student = db.prepare('SELECT id, name, rollNo, className FROM students WHERE id = ?').get(studentId);
+    const student = await db.get('SELECT id, name, rollNo, className FROM students WHERE id = ?', [studentId]);
     if (!student) {
       return res.status(404).json({ error: 'Student not found' });
     }
@@ -274,27 +277,27 @@ router.get('/student-records', requirePermission('view_attendance_report'), (req
         if (rangeDays > MAX_GEN_DAYS) start = new Date(end.getTime() - MAX_GEN_DAYS * 86400000);
         const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         for (let t = new Date(start); t <= end; t.setDate(t.getDate() + 1)) {
-          ensureAbsentRecords(student.className, iso(t));
+          await ensureAbsentRecords(student.className, iso(t));
         }
       }
     }
 
     query += ' ORDER BY scheduledDate DESC, periodIndex ASC';
-    const records = db.prepare(query).all(...params);
+    const records = await db.all(query, params);
     res.json({ student, records });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // GET attendance for a specific student
-router.get('/student/:studentId', requirePermission('view_attendance'), (req, res) => {
+router.get('/student/:studentId', requirePermission('view_attendance'), async (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM attendance_records WHERE studentId = ? ORDER BY createdAt DESC').all(req.params.studentId);
+    const rows = await db.all('SELECT * FROM attendance_records WHERE studentId = ? ORDER BY createdAt DESC', [req.params.studentId]);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // GET attendance summary for a class
-router.get('/summary/:className', requirePermission('view_attendance'), (req, res) => {
+router.get('/summary/:className', requirePermission('view_attendance'), async (req, res) => {
   try {
     const { date } = req.query;
     let query = `
@@ -309,28 +312,28 @@ router.get('/summary/:className', requirePermission('view_attendance'), (req, re
     const params = [req.params.className];
     if (date) { query += ' AND scheduledDate = ?'; params.push(date); }
     query += ' GROUP BY studentId ORDER BY studentName';
-    const rows = db.prepare(query).all(...params);
+    const rows = await db.all(query, params);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Self view: current user's own attendance records (Student) ──
-router.get('/my', requirePermission('view_own_attendance'), (req, res) => {
+router.get('/my', requirePermission('view_own_attendance'), async (req, res) => {
   try {
     // Resolve the linked student record using the same logic as POST /mark
     const userRow = req.user.linkedStudentId != null
       ? req.user
-      : db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+      : await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
     let student = null;
     if (userRow && userRow.linkedStudentId != null) {
-      student = db.prepare('SELECT id, name, className FROM students WHERE id = ?').get(userRow.linkedStudentId);
+      student = await db.get('SELECT id, name, className FROM students WHERE id = ?', [userRow.linkedStudentId]);
     }
     if (!student) {
-      student = db.prepare('SELECT id, name, className FROM students WHERE linkedUserId = ?').get(req.user.id);
+      student = await db.get('SELECT id, name, className FROM students WHERE linkedUserId = ?', [req.user.id]);
     }
     if (!student) {
-      student = db.prepare('SELECT id, name, className FROM students WHERE className = ? ORDER BY id LIMIT 1')
-        .get(userRow?.className || req.user.className);
+      student = await db.get('SELECT id, name, className FROM students WHERE className = ? ORDER BY id LIMIT 1',
+        [userRow?.className || req.user.className]);
     }
     if (!student) {
       return res.status(400).json({ error: 'No linked student profile found for this account' });
@@ -342,24 +345,25 @@ router.get('/my', requirePermission('view_own_attendance'), (req, res) => {
       const start = new Date(today.getTime() - 30 * 86400000);
       const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       for (let t = new Date(start); t <= today; t.setDate(t.getDate() + 1)) {
-        ensureAbsentRecords(student.className, iso(t));
+        await ensureAbsentRecords(student.className, iso(t));
       }
     }
-    const records = db.prepare(
-      'SELECT * FROM attendance_records WHERE studentId = ? ORDER BY scheduledDate DESC, periodIndex ASC'
-    ).all(student.id);
+    const records = await db.all(
+      'SELECT * FROM attendance_records WHERE studentId = ? ORDER BY scheduledDate DESC, periodIndex ASC',
+      [student.id]
+    );
     res.json({ records, student });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Attendance report: per-student approved/rejected counts over a date range ──
-router.get('/report', requirePermission('view_attendance_report'), (req, res) => {
+router.get('/report', requirePermission('view_attendance_report'), async (req, res) => {
   try {
     const { className, from, to } = req.query;
     if (!className) return res.status(400).json({ error: 'className is required' });
     const fromDate = from || '1900-01-01';
     const toDate = to || '9999-12-31';
-    const rows = db.prepare(`
+    const rows = await db.all(`
       SELECT
         s.id AS studentId, s.name AS studentName, s.rollNo, s.className,
         COUNT(a.id) AS totalDays,
@@ -376,10 +380,10 @@ router.get('/report', requirePermission('view_attendance_report'), (req, res) =>
         AND s.status = 'Active'
       GROUP BY s.id
       ORDER BY s.name ASC
-    `).all(fromDate, toDate, className);
+    `, [fromDate, toDate, className]);
 
     // Who approved / rejected each record in the range (joined to the users table)
-    const actors = db.prepare(`
+    const actors = await db.all(`
       SELECT a.studentId, a.status, a.approvedBy AS username, u.fullName, u.role, a.approvedAt
       FROM attendance_records a
       JOIN students s ON s.id = a.studentId
@@ -390,7 +394,7 @@ router.get('/report', requirePermission('view_attendance_report'), (req, res) =>
         AND a.status IN ('approved', 'rejected')
         AND a.approvedBy IS NOT NULL
       ORDER BY a.approvedAt ASC
-    `).all(className, fromDate, toDate);
+    `, [className, fromDate, toDate]);
 
     const approversById = {};
     const rejectersById = {};
@@ -414,22 +418,22 @@ router.get('/report', requirePermission('view_attendance_report'), (req, res) =>
     res.json({ rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-router.put('/approve/:id', requirePermission('approve_attendance'), (req, res) => {
+router.put('/approve/:id', requirePermission('approve_attendance'), async (req, res) => {
   try {
     const { action } = req.body;
-    const record = db.prepare('SELECT * FROM attendance_records WHERE id = ?').get(req.params.id);
+    const record = await db.get('SELECT * FROM attendance_records WHERE id = ?', [req.params.id]);
     if (!record) return res.status(404).json({ error: 'Record not found' });
     const newStatus = action === 'reject' ? 'rejected' : 'approved';
     const now = new Date().toISOString();
-    db.prepare('UPDATE attendance_records SET status = ?, approvedBy = ?, approvedAt = ? WHERE id = ?')
-      .run(newStatus, req.user.username, now, req.params.id);
-    const updated = db.prepare('SELECT * FROM attendance_records WHERE id = ?').get(req.params.id);
+    await db.run('UPDATE attendance_records SET status = ?, approvedBy = ?, approvedAt = ? WHERE id = ?',
+      [newStatus, req.user.username, now, req.params.id]);
+    const updated = await db.get('SELECT * FROM attendance_records WHERE id = ?', [req.params.id]);
     res.json(updated);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // PUT bulk approve/reject
-router.put('/bulk-action', requirePermission('approve_attendance'), (req, res) => {
+router.put('/bulk-action', requirePermission('approve_attendance'), async (req, res) => {
   try {
     const { ids, action } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -437,17 +441,19 @@ router.put('/bulk-action', requirePermission('approve_attendance'), (req, res) =
     }
     const newStatus = action === 'reject' ? 'rejected' : 'approved';
     const now = new Date().toISOString();
-    const stmt = db.prepare('UPDATE attendance_records SET status = ?, approvedBy = ?, approvedAt = ? WHERE id = ?');
-    const bulkUpdate = db.transaction(() => {
-      for (const id of ids) { stmt.run(newStatus, req.user.username, now, id); }
+    const bulkUpdate = db.transaction(async ({ run }) => {
+      for (const id of ids) {
+        await run('UPDATE attendance_records SET status = ?, approvedBy = ?, approvedAt = ? WHERE id = ?',
+          [newStatus, req.user.username, now, id]);
+      }
     });
-    bulkUpdate();
+    await bulkUpdate();
     res.json({ success: true, updated: ids.length });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // PUT approve/reject a student's pending records inside a date range (Attendance Report)
-router.put('/report-action', requirePermission('approve_attendance'), (req, res) => {
+router.put('/report-action', requirePermission('approve_attendance'), async (req, res) => {
   try {
     const { studentId, from, to, action } = req.body;
     if (studentId == null || !from || !to) {
@@ -455,34 +461,35 @@ router.put('/report-action', requirePermission('approve_attendance'), (req, res)
     }
     const newStatus = action === 'reject' ? 'rejected' : 'approved';
     const now = new Date().toISOString();
-    const result = db.prepare(
-      'UPDATE attendance_records SET status = ?, approvedBy = ?, approvedAt = ? WHERE studentId = ? AND status = ? AND scheduledDate BETWEEN ? AND ?'
-    ).run(newStatus, req.user.username, now, studentId, 'pending', from, to);
+    const result = await db.run(
+      'UPDATE attendance_records SET status = ?, approvedBy = ?, approvedAt = ? WHERE studentId = ? AND status = ? AND scheduledDate BETWEEN ? AND ?',
+      [newStatus, req.user.username, now, studentId, 'pending', from, to]
+    );
     res.json({ success: true, updated: result.changes });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Update a record's presence (Present / Late / Absent) ──
-router.put('/:id/presence', requirePermission('approve_attendance'), (req, res) => {
+router.put('/:id/presence', requirePermission('approve_attendance'), async (req, res) => {
   try {
     const { presence } = req.body;
     if (!['present', 'late', 'absent'].includes(presence)) {
       return res.status(400).json({ error: "presence must be 'present', 'late', or 'absent'" });
     }
-    const record = db.prepare('SELECT * FROM attendance_records WHERE id = ?').get(req.params.id);
+    const record = await db.get('SELECT * FROM attendance_records WHERE id = ?', [req.params.id]);
     if (!record) return res.status(404).json({ error: 'Record not found' });
-    db.prepare('UPDATE attendance_records SET presence = ? WHERE id = ?').run(presence, req.params.id);
-    const updated = db.prepare('SELECT * FROM attendance_records WHERE id = ?').get(req.params.id);
+    await db.run('UPDATE attendance_records SET presence = ? WHERE id = ?', [presence, req.params.id]);
+    const updated = await db.get('SELECT * FROM attendance_records WHERE id = ?', [req.params.id]);
     res.json(updated);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Delete a single attendance record ──
-router.delete('/:id', requirePermission('approve_attendance'), (req, res) => {
+router.delete('/:id', requirePermission('approve_attendance'), async (req, res) => {
   try {
-    const record = db.prepare('SELECT * FROM attendance_records WHERE id = ?').get(req.params.id);
+    const record = await db.get('SELECT * FROM attendance_records WHERE id = ?', [req.params.id]);
     if (!record) return res.status(404).json({ error: 'Record not found' });
-    db.prepare('DELETE FROM attendance_records WHERE id = ?').run(req.params.id);
+    await db.run('DELETE FROM attendance_records WHERE id = ?', [req.params.id]);
     res.json({ success: true, deleted: req.params.id });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

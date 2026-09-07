@@ -60,24 +60,24 @@ const DEFAULT_RIGHTS = {
   upload_own_teacher_card_photo: ['teacher_admin'],
 };
 
-function roleHasRight(role, rightKey) {
+async function roleHasRight(role, rightKey) {
   const defaults = DEFAULT_RIGHTS[rightKey] || [];
-  const row = db.prepare('SELECT granted FROM role_permissions WHERE role = ? AND rightKey = ?').get(role, rightKey);
+  const row = await db.get('SELECT granted FROM role_permissions WHERE role = ? AND rightKey = ?', [role, rightKey]);
   if (row) return !!row.granted;
   return defaults.includes(role);
 }
 
-export function userHasRight(userId, role, rightKey) {
+export async function userHasRight(userId, role, rightKey) {
   // Check user-level override first, then fall back to role-level
-  const userRow = db.prepare('SELECT granted FROM user_permissions WHERE userId = ? AND rightKey = ?').get(userId, rightKey);
+  const userRow = await db.get('SELECT granted FROM user_permissions WHERE userId = ? AND rightKey = ?', [userId, rightKey]);
   if (userRow) return !!userRow.granted;
   return roleHasRight(role, rightKey);
 }
 
 export function requirePermission(rightKey) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
-    if (userHasRight(req.user.id, req.user.role, rightKey)) return next();
+    if (await userHasRight(req.user.id, req.user.role, rightKey)) return next();
     return res.status(403).json({ error: 'You do not have permission to perform this action' });
   };
 }
