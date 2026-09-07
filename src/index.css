@@ -267,11 +267,12 @@ input, select, textarea {
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  background: var(--gradient-primary);
+  background: #ffffff;
+  border: 1.5px solid var(--sidebar-accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: #059669;
   flex-shrink: 0;
   box-shadow: 0 4px 16px var(--sidebar-glow);
   transition: box-shadow 0.3s ease, transform 0.3s ease;
@@ -2118,15 +2119,15 @@ input, select, textarea {
 }
 
 .auth-logo-icon {
-  width: 72px;
-  height: 72px;
+  width: 76px;
+  height: 76px;
   border-radius: 20px;
-  background: var(--gradient-primary);
-  color: white;
+  background: #ffffff;
+  border: 2px solid var(--primary);
+  color: #059669;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
   margin-bottom: 14px;
   box-shadow: var(--shadow-md);
 }
@@ -3492,18 +3493,23 @@ footer {
   align-items: flex-start;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   Student / Teacher ID Card — NCBA & E Design
+   White card · maroon campus band · shield logo
+   ═══════════════════════════════════════════════════════════ */
 .id-card {
   position: relative;
   width: 100%;
-  max-width: 340px;
+  max-width: 360px;
   min-width: 260px;
-  border-radius: 16px;
-  padding: 16px;
-  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 55%, #ecfeff 100%);
+  border-radius: 14px;
+  padding: 0;
+  background: #ffffff;
   border: 1.5px solid var(--border);
   box-shadow: var(--shadow-md);
   font-size: 0.86rem;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
 }
 .id-card-approved {
   border-color: #a7f3d0;
@@ -3512,43 +3518,91 @@ footer {
 .id-card-pending { border-color: #fde68a; }
 .id-card-rejected { border-color: #fecaca; }
 
+/* ── Card Header ── */
 .id-card-header {
+  padding: 0;
+}
+.id-card-header-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 10px;
+}
+.id-card-shield-logo {
+  flex-shrink: 0;
+}
+.id-card-college-name {
+  flex: 1;
+  min-width: 0;
+}
+.id-card-college-title {
+  display: block;
+  font-family: 'Georgia', 'Times New Roman', 'Palatino Linotype', serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  line-height: 1.25;
+  letter-spacing: 0.2px;
+}
+
+/* ── Campus Band ── */
+.id-card-campus-band {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding-bottom: 12px;
-  border-bottom: 1px dashed var(--border);
+  background: linear-gradient(135deg, #7c1d2e 0%, #9b2335 50%, #7c1d2e 100%);
+  color: #ffffff;
+  padding: 6px 16px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
-.id-card-brand { display: flex; align-items: center; gap: 8px; color: var(--primary); }
-.id-card-brand-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.15;
-}
-.id-card-brand-text strong { font-size: 0.92rem; color: var(--dark); letter-spacing: 0.2px; }
-.id-card-brand-text span {
-  font-size: 0.62rem;
-  color: var(--gray);
+
+/* ── Status Pill (inside campus band) ── */
+.id-card-status-pill {
+  font-size: 0.56rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
+.id-card-status-none {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+.id-card-status-pending {
+  background: #fbbf24;
+  color: #78350f;
+}
+.id-card-status-approved {
+  background: #34d399;
+  color: #064e3b;
+}
+.id-card-status-rejected {
+  background: #f87171;
+  color: #7f1d1d;
+}
 
+/* ── Card Body ── */
 .id-card-body {
   display: flex;
   gap: 14px;
   align-items: flex-start;
-  padding-top: 14px;
+  padding: 14px 16px 16px;
 }
+
+/* ── Photo ── */
 .id-card-photo {
   position: relative;
-  width: 84px;
-  height: 100px;
+  width: 90px;
+  height: 108px;
   flex-shrink: 0;
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
   background: var(--light-gray);
-  border: 1px solid var(--border);
+  border: 1.5px solid #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3563,63 +3617,79 @@ footer {
   font-size: 1.5rem;
   font-weight: 800;
   color: var(--white);
-  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
   width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  letter-spacing: 1px;
 }
 .id-card-cr-tag {
   position: absolute;
   bottom: 4px;
   right: 4px;
-  background: var(--secondary);
+  background: #7c3aed;
   color: #fff;
-  font-size: 0.58rem;
+  font-size: 0.56rem;
   font-weight: 800;
   letter-spacing: 0.5px;
   padding: 2px 6px;
   border-radius: 999px;
 }
 .id-card-teacher-tag {
-  background: var(--accent);
+  background: #d97706;
 }
 
+/* ── Info Fields ── */
 .id-card-info {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
 }
-.id-card-field { display: flex; flex-direction: column; line-height: 1.2; }
+.id-card-field {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 6px;
+}
+.id-card-field:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
 .id-card-field span {
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--gray);
+  letter-spacing: 0.6px;
+  color: #64748b;
+  margin-bottom: 2px;
+  font-weight: 500;
 }
 .id-card-field strong {
-  font-size: 0.86rem;
-  color: var(--dark);
+  font-size: 0.84rem;
+  color: #0f172a;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 600;
 }
 .id-card-field strong.id-card-subjects {
   white-space: normal;
   line-height: 1.35;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
 }
 
+/* ── Review Note (rejection) ── */
 .id-card-review-note {
-  margin-top: 12px;
+  margin: 0;
   background: var(--danger-bg);
   color: var(--danger);
   font-size: 0.74rem;
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 8px 16px;
+  border-top: 1px solid #fecaca;
 }
 
 .card-tile { display: flex; flex-direction: column; gap: 12px; }
