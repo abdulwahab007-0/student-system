@@ -9,43 +9,15 @@ const STATUS_META = {
   rejected: { label: 'Photo Rejected', cls: 'id-card-status-rejected' },
 };
 
-/* Inline shield logo used inside the card header */
+/* Shield logo used inside the card header */
 function ShieldLogo({ size = 32 }) {
   return (
-    <svg width={size} height={size * 1.2} viewBox="0 0 60 72" xmlns="http://www.w3.org/2000/svg" className="id-card-shield-logo">
-      <defs>
-        <clipPath id="shieldClip">
-          <path d="M30 3 L57 14 L57 36 C57 54 30 69 30 69 C30 69 3 54 3 36 L3 14 Z"/>
-        </clipPath>
-      </defs>
-      <path d="M30 3 L57 14 L57 36 C57 54 30 69 30 69 C30 69 3 54 3 36 L3 14 Z" fill="#ffffff" stroke="#1e293b" strokeWidth="2"/>
-      <g clipPath="url(#shieldClip)">
-        <rect x="3" y="14" width="11" height="11" fill="#059669"/>
-        <rect x="14" y="14" width="11" height="11" fill="#7c3aed"/>
-        <rect x="25" y="14" width="11" height="11" fill="#059669"/>
-        <rect x="36" y="14" width="11" height="11" fill="#7c3aed"/>
-        <rect x="47" y="14" width="11" height="11" fill="#059669"/>
-        <rect x="3" y="25" width="11" height="11" fill="#7c3aed"/>
-        <rect x="14" y="25" width="11" height="11" fill="#059669"/>
-        <rect x="25" y="25" width="11" height="11" fill="#7c3aed"/>
-        <rect x="36" y="25" width="11" height="11" fill="#059669"/>
-        <rect x="47" y="25" width="11" height="11" fill="#7c3aed"/>
-        <rect x="3" y="36" width="11" height="11" fill="#059669"/>
-        <rect x="14" y="36" width="11" height="11" fill="#7c3aed"/>
-        <rect x="25" y="36" width="11" height="11" fill="#059669"/>
-        <rect x="36" y="36" width="11" height="11" fill="#7c3aed"/>
-        <rect x="47" y="36" width="11" height="11" fill="#059669"/>
-        <rect x="8" y="47" width="11" height="11" fill="#7c3aed"/>
-        <rect x="19" y="47" width="11" height="11" fill="#059669"/>
-        <rect x="30" y="47" width="11" height="11" fill="#7c3aed"/>
-        <rect x="41" y="47" width="11" height="11" fill="#059669"/>
-        <rect x="14" y="58" width="11" height="11" fill="#059669"/>
-        <rect x="25" y="58" width="11" height="11" fill="#7c3aed"/>
-        <rect x="36" y="58" width="11" height="11" fill="#059669"/>
-      </g>
-      <polygon points="30,22 33,31 42,31 35,36 37,45 30,40 23,45 25,36 18,31 27,31" fill="#ffffff" opacity="0.92"/>
-      <polygon points="30,26 32,32 38,32 33,36 35,42 30,38 25,42 27,36 22,32 28,32" fill="#fbbf24"/>
-    </svg>
+    <img
+      src="/ncba-logo.webp"
+      alt="NCBA&F Shield"
+      className="id-card-shield-logo"
+      style={{ width: size, height: size, objectFit: 'contain', borderRadius: 4, flexShrink: 0 }}
+    />
   );
 }
 
