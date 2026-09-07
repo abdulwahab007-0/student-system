@@ -3745,10 +3745,26 @@ footer {
 }
 .hint-text { font-size: 0.74rem; color: var(--gray); }
 
-/* Dark mode overrides for the ID card module */
+/* ── Dark mode: force ID card to always look like a physical card ── */
 .dark .id-card {
-  background: linear-gradient(135deg, #022c22 0%, #0f172a 55%, #082f49 100%);
+  background: #ffffff;
+  border-color: #e2e8f0;
 }
-.dark .id-card-review-note { background: rgba(220, 38, 38, 0.16); }
-.dark .reject-form { background: #1e293b; }
-.dark .id-card-photo { background: #1e293b; }
+.dark .id-card-approved { border-color: #a7f3d0; }
+.dark .id-card-pending { border-color: #fde68a; }
+.dark .id-card-rejected { border-color: #fecaca; }
+.dark .id-card-photo { background: #f8fafc; border-color: #e2e8f0; }
+.dark .id-card-photo-placeholder {
+  color: #ffffff;
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+}
+.dark .id-card-college-title { color: #1a1a2e; }
+.dark .id-card-campus-band {
+  background: linear-gradient(135deg, #7c1d2e 0%, #9b2335 50%, #7c1d2e 100%);
+  color: #ffffff;
+}
+.dark .id-card-field { border-bottom-color: #f1f5f9; }
+.dark .id-card-field span { color: #64748b; }
+.dark .id-card-field strong { color: #0f172a; }
+.dark .id-card-review-note { background: #fef2f2; color: #dc2626; border-top-color: #fecaca; }
+.dark .reject-form { background: #f8fafc; border-color: #e2e8f0; }
