@@ -16,3 +16,5 @@ database.sqlite-*
 # Locally uploaded card photos (persistent only in dev)
 uploads/
 
+.vercel
+.env*

@@ -5,7 +5,8 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "rewrites": [
-    { "source": "/api/uploads/(.*)", "destination": "/api/uploads/$1" },
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/uploads/(.*)", "destination": "/api" },
     { "source": "/(.*)", "destination": "/" }
   ]
 }
