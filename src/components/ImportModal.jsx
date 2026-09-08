@@ -109,10 +109,27 @@ export default function ImportModal({ type, onImport, onBulkImport, onCreateAcco
     const accountsCreated = [];
     setProgress({ done: 0, total: rows.length });
 
+    // ── Filter out rows with validation errors ──
+    const validIndices = [];
+    rows.forEach((row, i) => {
+      const missing = validateRow(type, row);
+      if (missing.length > 0) {
+        errorMessages.push(`Row ${i + 1} (${row.name || 'unnamed'}): missing ${missing.join(', ')}`);
+      } else {
+        validIndices.push(i);
+      }
+    });
+    if (validIndices.length === 0) {
+      setImporting(false);
+      setImportComplete(true);
+      setImportResult({ success: 0, failed: rows.length, errors: errorMessages, accounts: [] });
+      return;
+    }
+
     // ── Fast path: bulk import via server transaction ──
     if (onBulkImport) {
       try {
-        const prepared = rows.map((row, i) => applyDefaults(type, row, i));
+        const prepared = validIndices.map(i => applyDefaults(type, rows[i], i));
         const result = await onBulkImport(prepared);
         if (result && Array.isArray(result.students)) {
           success = result.students.length;
@@ -169,7 +186,8 @@ export default function ImportModal({ type, onImport, onBulkImport, onCreateAcco
     }
 
     // ── Fallback: one-by-one import ──
-    for (let i = 0; i < rows.length; i++) {
+    for (let vi = 0; vi < validIndices.length; vi++) {
+      const i = validIndices[vi];
       try {
         const data = applyDefaults(type, rows[i], i);
         const entityId = await onImport(data);
@@ -205,7 +223,7 @@ export default function ImportModal({ type, onImport, onBulkImport, onCreateAcco
         const rowName = rows[i]?.name || `Row ${i + 1}`;
         errorMessages.push(`${rowName}: ${err.message || 'Import failed'}`);
       }
-      setProgress({ done: i + 1, total: rows.length });
+      setProgress({ done: vi + 1, total: validIndices.length });
     }
     setImporting(false);
     setImportComplete(true);
@@ -327,7 +345,7 @@ export default function ImportModal({ type, onImport, onBulkImport, onCreateAcco
           <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
           <button
             className="btn btn-primary"
-            disabled={rows.length === 0 || importing || Object.keys(errors).length > 0}
+            disabled={rows.length === 0 || importing}
             onClick={handleImport}
           >
             {importing

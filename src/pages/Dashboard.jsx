@@ -27,16 +27,33 @@ function Dashboard() {
   const isStudent = role === 'student';
   const isAdmin = ['super_admin', 'cr_admin', 'teacher_admin'].includes(role);
 
+  // For students: build a synthetic student record from the logged-in user's
+  // data so the dashboard works even when the /students endpoint returns 403.
+  const myStudentData = isStudent ? {
+    id: currentUser.linkedStudentId,
+    name: currentUser.fullName,
+    className: currentUser.className,
+    email: currentUser.email,
+    status: 'Active',
+  } : null;
+
   // Filter data based on role
   const visibleStudents = isStudent
-    ? students.filter(s => s.name.toLowerCase().includes(currentUser?.fullName?.toLowerCase() || ''))
+    ? (myStudentData ? [myStudentData] : [])
     : role === 'cr_admin' && !currentUser?.manageAllClasses
       ? students.filter(s => s.className === userClass)
       : students;
 
-  const visibleMarks = (isStudent || role === 'cr_admin')
-    ? marks.filter(m => visibleStudents.some(s => s.id === m.studentId))
-    : marks;
+  // For student: match own marks by linkedStudentId or studentName (since
+  // the /students endpoint may not be accessible for students).
+  const visibleMarks = isStudent
+    ? marks.filter(m =>
+        (currentUser.linkedStudentId != null && m.studentId === currentUser.linkedStudentId) ||
+        m.studentName === currentUser.fullName
+      )
+    : (role === 'cr_admin')
+      ? marks.filter(m => visibleStudents.some(s => s.id === m.studentId))
+      : marks;
 
   // Teacher admin only sees their subject marks
   const teacherSubjects = role === 'teacher_admin'
@@ -70,8 +87,7 @@ function Dashboard() {
 
   const recentStudents = [...visibleStudents].sort((a, b) => b.id - a.id).slice(0, 6);
 
-  // For student role, get their own data
-  const myStudentData = isStudent ? visibleStudents[0] : null;
+  // For student role, use the own marks already derived above
   const myMarks = isStudent ? visibleMarksForRole : [];
   const mySubjects = isStudent
     ? subjects.filter(s => (s.className || '').split(',').map(c => c.trim()).includes(myStudentData?.className || currentUser?.className))

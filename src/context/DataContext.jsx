@@ -25,12 +25,16 @@ export function DataProvider({ children }) {
       return;
     }
     setLoading(true);
-    Promise.all([
+    // Use Promise.allSettled so that 403 errors on specific endpoints (e.g.
+    // students/teachers/classes for student role) don't prevent the rest of
+    // the data (subjects, marks) from loading.
+    Promise.allSettled([
       api.getStudents(), api.getTeachers(), api.getSubjects(),
       api.getMarks(), api.getClasses()
-    ]).then(([s, t, sub, m, c]) => {
-      setStudents(s); setTeachers(t); setSubjects(sub);
-      setMarks(m); setClasses(c);
+    ]).then(results => {
+      const ok = results.map(r => r.status === 'fulfilled' ? r.value : []);
+      setStudents(ok[0]); setTeachers(ok[1]); setSubjects(ok[2]);
+      setMarks(ok[3]); setClasses(ok[4]);
     }).catch(err => console.error('Failed to load data:', err))
       .finally(() => setLoading(false));
   }, [currentUser?.id]);
@@ -158,11 +162,12 @@ export function DataProvider({ children }) {
   };
 
   const resetData = async () => {
-    // Reload all data from server
-    const [s, t, sub, m, c] = await Promise.all([
+    // Reload all data from server (resilient to per-endpoint failures)
+    const results = await Promise.allSettled([
       api.getStudents(), api.getTeachers(), api.getSubjects(),
       api.getMarks(), api.getClasses()
     ]);
+    const [s, t, sub, m, c] = results.map(r => r.status === 'fulfilled' ? r.value : []);
     setStudents(s); setTeachers(t); setSubjects(sub);
     setMarks(m); setClasses(c);
   };

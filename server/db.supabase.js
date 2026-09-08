@@ -117,6 +117,7 @@ const CAMEL_OVERRIDES = {
   approvedby: 'approvedBy',
   approvedat: 'approvedAt',
   cardid: 'cardId',
+  rightkey: 'rightKey',
 };
 
 function camelizeRow(row) {
@@ -151,18 +152,20 @@ export async function get(text, params = []) {
 }
 
 /** Execute INSERT/UPDATE/DELETE — returns { changes, lastInsertRowid }.
- *  INSERTs get " RETURNING id" so lastInsertRowid works like in SQLite. */
+ *  INSERTs get " RETURNING *" so lastInsertRowid works like in SQLite.
+ *  Using * instead of id handles tables with composite PKs (no id column). */
 export async function run(text, params = []) {
   const trimmed = String(text).trim().replace(/;\s*$/, '');
   const sql = toPgSql(trimmed);
   const isInsert = /^\s*insert\b/i.test(sql);
   const hasReturning = /\breturning\b/i.test(sql);
-  const finalSql = isInsert && !hasReturning ? `${sql} RETURNING id` : sql;
+  const finalSql = isInsert && !hasReturning ? `${sql} RETURNING *` : sql;
   const res = await pool.query(finalSql, params);
   const rows = res.rows || [];
+  const lastRow = rows[rows.length - 1];
   return {
     changes: res.rowCount ?? 0,
-    lastInsertRowid: isInsert && rows.length ? Number(rows[rows.length - 1].id) : 0,
+    lastInsertRowid: isInsert && rows.length && lastRow?.id != null ? Number(lastRow.id) : 0,
   };
 }
 
@@ -199,12 +202,13 @@ export function transaction(fn) {
         const sql = toPgSql(trimmed);
         const isInsert = /^\s*insert\b/i.test(sql);
         const hasReturning = /\breturning\b/i.test(sql);
-        const finalSql = isInsert && !hasReturning ? `${sql} RETURNING id` : sql;
+        const finalSql = isInsert && !hasReturning ? `${sql} RETURNING *` : sql;
         const res = await client.query(finalSql, p);
         const rows = res.rows || [];
+        const lastRow = rows[rows.length - 1];
         return {
           changes: res.rowCount ?? 0,
-          lastInsertRowid: isInsert && rows.length ? Number(rows[rows.length - 1].id) : 0,
+          lastInsertRowid: isInsert && rows.length && lastRow?.id != null ? Number(lastRow.id) : 0,
         };
       },
     };

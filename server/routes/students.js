@@ -4,11 +4,19 @@ import { requirePermission } from '../middleware/auth.js';
 const router = Router();
 
 // ── Helpers ──
+// Compute the next unique "STU-###" roll number based on the highest existing
+// STU-… value (NOT a row count — count-based generation collides when students
+// are deleted, and when called from within a transaction it cannot see that
+// transaction's own uncommitted inserts).
 async function nextRollNo() {
-  const cnt = await db.get('SELECT COUNT(*) as c FROM students');
-  let roll = 'STU-' + String(cnt.c + 1).padStart(3, '0');
+  const row = await db.get(
+    "SELECT COALESCE(MAX(CAST(SUBSTRING(rollNo FROM 5) AS INTEGER)), 0) AS maxNum FROM students WHERE rollNo LIKE 'STU-%'"
+  );
+  let num = (row && row.maxnum ? row.maxnum : 0) + 1;
+  let roll = 'STU-' + String(num).padStart(3, '0');
   while (await db.get('SELECT 1 FROM students WHERE rollNo = ?', [roll])) {
-    roll = 'STU-' + String(parseInt(roll.split('-')[1]) + 1).padStart(3, '0');
+    num += 1;
+    roll = 'STU-' + String(num).padStart(3, '0');
   }
   return roll;
 }
@@ -64,7 +72,15 @@ router.post('/', requirePermission('add_students'), async (req, res) => {
   }
 });
 
-// ── Bulk import (transaction with per-row error handling) ──
+// ── Bulk import (per-row error handling) ──
+// NOTE: deliberately NOT wrapped in a single db.transaction(). SQLite lets a
+// failed statement coexist with successful ones inside a transaction, but
+// PostgreSQL aborts the ENTIRE transaction when any statement errors — so a
+// single bad row would silently discard every otherwise-successful insert even
+// though the helper functions below (ensureClassExists / resolveRollNo) also
+// query the DB using the module-level pool, which cannot see a transaction's
+// uncommitted rows. Importing each row independently keeps valid rows durable
+// and surfaces per-row errors, which is what the UI promises.
 router.post('/import', requirePermission('add_students'), async (req, res) => {
   try {
     const { students } = req.body;
@@ -73,23 +89,20 @@ router.post('/import', requirePermission('add_students'), async (req, res) => {
     }
     const results = [];
     const errors  = [];
-    const bulkInsert = db.transaction(async ({ run, get }) => {
-      for (let i = 0; i < students.length; i++) {
-        const s = students[i];
-        try {
-          if (!s.name) { errors.push({ index: i, name: s.name || `Row ${i+1}`, error: 'Name is required' }); continue; }
-          await ensureClassExists(s.className);
-          const finalRollNo = await resolveRollNo(s.rollNo);
-          const r = await run('INSERT INTO students (name,email,phone,rollNo,className,gender,address,dateOfBirth,admissionDate,status,isCR) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-            [s.name, s.email||'', s.phone||'', finalRollNo, s.className||'', s.gender||'', s.address||'', s.dateOfBirth||'', s.admissionDate||'', s.status||'Active', s.isCR?1:0]);
-          results.push(await get('SELECT * FROM students WHERE id = ?', [r.lastInsertRowid]));
-        } catch (rowErr) {
-          console.error(`Bulk import error row ${i} (${s.name}):`, rowErr);
-          errors.push({ index: i, name: s.name||`Row ${i+1}`, error: rowErr.message || 'Unknown error' });
-        }
+    for (let i = 0; i < students.length; i++) {
+      const s = students[i];
+      try {
+        if (!s.name) { errors.push({ index: i, name: s.name || `Row ${i+1}`, error: 'Name is required' }); continue; }
+        await ensureClassExists(s.className);
+        const finalRollNo = await resolveRollNo(s.rollNo);
+        const r = await db.run('INSERT INTO students (name,email,phone,rollNo,className,gender,address,dateOfBirth,admissionDate,status,isCR) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+          [s.name, s.email||'', s.phone||'', finalRollNo, s.className||'', s.gender||'', s.address||'', s.dateOfBirth||'', s.admissionDate||'', s.status||'Active', s.isCR?1:0]);
+        results.push(await db.get('SELECT * FROM students WHERE id = ?', [r.lastInsertRowid]));
+      } catch (rowErr) {
+        console.error(`Bulk import error row ${i} (${s.name}):`, rowErr);
+        errors.push({ index: i, name: s.name||`Row ${i+1}`, error: rowErr.message || 'Unknown error' });
       }
-    });
-    await bulkInsert();
+    }
     res.json({ success: errors.length === 0, imported: results.length, failed: errors.length, students: results, errors });
   } catch (err) {
     console.error('Bulk import error:', err);
