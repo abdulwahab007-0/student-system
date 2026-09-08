@@ -6,6 +6,18 @@ import { requirePermission } from '../middleware/auth.js';
 
 const router = Router();
 
+// Set the students.linkedUserId back-reference so the admin portal's student
+// list can show whether a portal login exists for each student. Called whenever
+// a portal account is created / updated for a student.
+async function syncStudentLink(db, studentId, userId) {
+  if (!studentId || !userId) return;
+  try {
+    await db.run('UPDATE students SET linkedUserId = ? WHERE id = ?', [userId, studentId]);
+  } catch (err) {
+    console.error('syncStudentLink failed:', err.message);
+  }
+}
+
 // GET /api/users - all users
 router.get('/', async (req, res) => {
   const users = await db.all('SELECT id,username,email,fullName,role,status,className,registrationDate,linkedStudentId,crForClass,manageAllClasses FROM users ORDER BY id');
@@ -25,13 +37,19 @@ router.post('/:id/approve', async (req, res) => {
   await db.run('UPDATE users SET status = ? WHERE id = ?', ['approved', user.id]);
   // If student, create student record
   if (user.role === 'student') {
-    const exists = await db.get('SELECT id FROM students WHERE email = ? OR name = ?', [user.email, user.fullName]);
+    let exists = await db.get('SELECT id FROM students WHERE email = ? OR name = ?', [user.email, user.fullName]);
     if (!exists) {
       const cnt = await db.get('SELECT COUNT(*) as c FROM students');
       const roll = 'STU-' + String(cnt.c + 1).padStart(3, '0');
-      await db.run('INSERT INTO students (name,email,phone,rollNo,className,gender,address,dateOfBirth,admissionDate,status) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      const r = await db.run('INSERT INTO students (name,email,phone,rollNo,className,gender,address,dateOfBirth,admissionDate,status) VALUES (?,?,?,?,?,?,?,?,?,?)',
         [user.fullName, user.email, '', roll, user.className || 'BSCS', 'Male', '', '', new Date().toISOString().slice(0, 10), 'Active']);
+      exists = { id: r.lastInsertRowid };
     }
+    // Establish the two-way link so the student portal refreshes their class and
+    // the admin portal shows that this student now has a login.
+    await syncStudentLink(db, exists.id, user.id);
+    await db.run('UPDATE users SET linkedStudentId = ?, className = COALESCE(className, (SELECT className FROM students WHERE id = ?)) WHERE id = ?',
+      [exists.id, exists.id, user.id]);
   }
   res.json({ success: true });
 });
@@ -55,6 +73,9 @@ router.post('/create-account', async (req, res) => {
       await db.run('UPDATE users SET role=?, status=?, className=?, linkedStudentId=? WHERE id=?',
         [role || 'student', 'approved', className || existing.className, linkedStudentId || existing.linkedStudentId, existing.id]);
       const updated = await db.get('SELECT id,username,email,fullName,role,status,className,registrationDate,linkedStudentId,crForClass,manageAllClasses FROM users WHERE id=?', [existing.id]);
+      // Two-way link: mark the student record so the admin portal knows this
+      // student already has a portal login.
+      await syncStudentLink(db, linkedStudentId || existing.linkedStudentId, existing.id);
       return res.json({ success: true, created: false, account: updated });
     }
     // Check pending users
@@ -63,12 +84,14 @@ router.post('/create-account', async (req, res) => {
       await db.run('UPDATE users SET role=?, status=?, className=?, linkedStudentId=? WHERE id=?',
         [role || 'student', 'approved', className || pending.className, linkedStudentId || null, pending.id]);
       const updated = await db.get('SELECT id,username,email,fullName,role,status,className,registrationDate,linkedStudentId,crForClass,manageAllClasses FROM users WHERE id=?', [pending.id]);
+      await syncStudentLink(db, linkedStudentId, pending.id);
       return res.json({ success: true, created: false, upgradedFromPending: true, account: updated });
     }
     const defaultPw = defaultPasswordFor(role || 'student');
     const r = await db.run('INSERT INTO users (username,email,password,fullName,role,status,className,registrationDate,linkedStudentId) VALUES (?,?,?,?,?,?,?,?,?)',
       [username, email || `${username}@ncba.edu.pk`, bcrypt.hashSync(defaultPw, 10), fullName, role || 'student', 'approved', className || null, new Date().toISOString().slice(0, 10), linkedStudentId || null]);
     const user = await db.get('SELECT id,username,email,fullName,role,status,className,registrationDate,linkedStudentId,crForClass,manageAllClasses FROM users WHERE id=?', [r.lastInsertRowid]);
+    await syncStudentLink(db, linkedStudentId, r.lastInsertRowid);
     res.json({ success: true, created: true, account: { ...user, password: defaultPw } });
   } catch (err) {
     console.error('Error creating account:', err);

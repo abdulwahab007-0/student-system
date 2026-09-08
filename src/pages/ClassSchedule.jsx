@@ -178,7 +178,7 @@ function ClassSchedule() {
   const { subjects, classes } = useData();
   const canManage = hasPermission('edit_class_schedule');
   const isStudent = currentUser?.role === 'student';
-  const userClassName = currentUser?.className || '';
+  const userClassName = (currentUser?.className || '').trim();
   const [selectedClass, setSelectedClass] = useState('');
   const [schedule, setSchedule] = useState({ structure: emptyStructure(), slots: {} });
   const [showModal, setShowModal] = useState(false);
@@ -232,7 +232,17 @@ function ClassSchedule() {
 
   const classSubjects = subjects.filter(s => (s.className || '').split(',').map(c => c.trim()).includes(selectedClass));
   const displaySubjects = classSubjects.length > 0 ? classSubjects : subjects;
-  const visibleClasses = isStudent ? classes.filter(c => c.name === userClassName) : classes;
+  // For students the /classes endpoint returns 403 (view_classes is admin-only),
+  // so `classes` is empty here. Inject a synthetic entry for the student's own
+  // class so the class selector shows e.g. "BSCS" instead of being blank and
+  // "No Class Selected".
+  const visibleClasses = isStudent
+    ? classes.some(c => c.name === userClassName)
+      ? classes.filter(c => c.name === userClassName)
+      : userClassName
+        ? [{ id: `own-${userClassName}`, name: userClassName, code: userClassName.toUpperCase() }]
+        : []
+    : classes;
   const structure = schedule.structure || emptyStructure();
   const days = structure.days || [];
   const slots = schedule.slots || {};

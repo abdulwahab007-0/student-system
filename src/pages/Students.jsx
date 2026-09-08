@@ -296,12 +296,16 @@ function Students() {
     }
   };
 
-  // Find the login account linked to a student
+  // Find the login account linked to a student (by linkedStudentId, or by a
+  // case/whitespace-insensitive email / name match). The students roster and the
+  // login accounts can hold inconsistent capitalization or whitespace (e.g.
+  // " Ahmed Khan" vs "Ahmed Khan"), so normalize before comparing.
   const findStudentAccount = (student) => {
+    const norm = s => (s || '').trim().toLowerCase();
     return users.find(u =>
-      (u.linkedStudentId && u.linkedStudentId === student.id) ||
-      (u.email && student.email && u.email.toLowerCase() === student.email.toLowerCase()) ||
-      (u.fullName && u.fullName.toLowerCase() === student.name.toLowerCase())
+      (u.linkedStudentId && String(u.linkedStudentId) === String(student.id)) ||
+      (u.email && student.email && norm(u.email) === norm(student.email)) ||
+      (u.fullName && student.name && norm(u.fullName) === norm(student.name))
     ) || null;
   };
 
@@ -481,6 +485,34 @@ function Students() {
                                     CR
                                   </span>
                                 )}
+                                {(() => {
+                                  const acc = findStudentAccount(student);
+                                  return acc ? (
+                                    <span
+                                      title={`Portal login: ${acc.username}${acc.email ? ` (${acc.email})` : ''}`}
+                                      style={{
+                                        marginLeft: '8px', fontSize: '0.6rem', fontWeight: '600',
+                                        padding: '2px 8px', borderRadius: '12px',
+                                        background: 'var(--success-bg, #ecfdf5)', color: 'var(--success, #059669)',
+                                        border: '1px solid var(--success, #059669)', cursor: 'help', whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      🔗 Portal
+                                    </span>
+                                  ) : (
+                                    <span
+                                      title="No student portal login linked yet"
+                                      style={{
+                                        marginLeft: '8px', fontSize: '0.6rem', fontWeight: '600',
+                                        padding: '2px 8px', borderRadius: '12px',
+                                        background: 'var(--light-gray)', color: 'var(--gray)',
+                                        border: '1px solid var(--border)', cursor: 'help', whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      No portal link
+                                    </span>
+                                  );
+                                })()}
                               </div>
                               <div className="sub">{student.email}</div>
                             </div>

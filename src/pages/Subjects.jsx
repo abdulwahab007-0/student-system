@@ -183,7 +183,14 @@ function Subjects() {
   const { currentUser, hasPermission } = useAuth();
   const showToast = useToast();
   const [search, setSearch] = useState('');
-  const [filterClass, setFilterClass] = useState('');
+  // For students, pre-select their own class (e.g. BSCS) instead of showing the
+  // generic "All Classes" option. This guarantees a BSCS student sees BSCS
+  // subjects (and the matching BSCS option) on first load even though the
+  // /classes endpoint (view_classes) is off-limits to the student role.
+  const studentClass = (currentUser?.className || '').trim();
+  const [filterClass, setFilterClass] = useState(() =>
+    currentUser?.role === 'student' ? studentClass : ''
+  );
   const [showModal, setShowModal] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [editingSubject, setEditingSubject] = useState(null);
@@ -193,7 +200,7 @@ function Subjects() {
   const visibleSubjects = currentUser?.role === 'teacher_admin'
     ? subjects.filter(s => (s.teacher || '').includes(currentUser?.fullName || ''))
     : currentUser?.role === 'student'
-      ? subjects.filter(s => (s.className || '').split(',').map(c => c.trim()).includes(currentUser?.className))
+      ? subjects.filter(s => (s.className || '').split(',').map(c => c.trim()).includes(studentClass))
       : subjects;
 
   const filteredSubjects = visibleSubjects.filter(s => {

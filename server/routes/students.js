@@ -128,6 +128,28 @@ router.put('/:id', requirePermission('edit_students'), async (req, res) => {
     const isCR        = b.isCR        !== undefined ? (b.isCR ? 1 : 0) : existing.isCR;
     await db.run('UPDATE students SET name=?,email=?,phone=?,rollNo=?,className=?,gender=?,address=?,dateOfBirth=?,admissionDate=?,status=?,isCR=? WHERE id=?',
       [name, email||'', phone||'', rollNo||'', className||'', gender||'', address||'', dateOfBirth||'', admissionDate||'', status||'Active', isCR, req.params.id]);
+
+    // Keep the student's portal login account in sync so that when the student
+    // logs in, their class (and profile fields) reflect the latest admin change.
+    // Without this, the student portal would show a stale / wrong class and the
+    // wrong set of subjects after the admin edits the student record.
+    //
+    // Prefer the account explicitly linked to this student (linkedStudentId);
+    // fall back to an email match, then a normalized name match. We only update
+    // className and the linkedStudentId back-reference — never email/fullName —
+    // because name/email are the users table's UNIQUE keys and a greedy match
+    // across similarly-named users would otherwise violate uniqueness.
+    const linkedUser = await db.get('SELECT id FROM users WHERE linkedStudentId = ?', [req.params.id])
+      || await db.get('SELECT id FROM users WHERE email = ?', [email || ''])
+      || await db.get('SELECT id FROM users WHERE fullName IS NOT NULL AND LOWER(fullName) = LOWER(?)', [name || '']);
+    if (linkedUser) {
+      const newClass = className !== undefined ? className : existing.className;
+      await db.run('UPDATE users SET className = ?, linkedStudentId = ? WHERE id = ?',
+        [newClass ? String(newClass).trim() : null, req.params.id, linkedUser.id]);
+      // Two-way link so the admin portal's student list reflects the portal login.
+      await db.run('UPDATE students SET linkedUserId = ? WHERE id = ?', [linkedUser.id, req.params.id]);
+    }
+
     const student = await db.get('SELECT * FROM students WHERE id = ?', [req.params.id]);
     res.json(student);
   } catch (err) {
