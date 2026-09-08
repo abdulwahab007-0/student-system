@@ -39,7 +39,14 @@ if (!connectionString) {
 
 export const pool = new pg.Pool({
   connectionString,
-  max: 10,
+  // Keep max small: Supabase's *session-mode* pooler (`:5432`) caps the whole
+  // project at pool_size: 15 concurrent clients. Vercel spins up a *fresh* pool
+  // per cold-start instance, and several instances booting at once can exhaust
+  // the pooler (→ EMAXCONNSESSION). A smaller max per instance means the first
+  // request of a cold start gets a connection promptly instead of queuing while
+  // idle sockets pile up. This is not a throughput bottleneck: a serverless
+  // instance handles a handful of concurrent requests at most.
+  max: 4,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 10_000,
   // Supabase's connection-pooler uses a proxy cert, so rejectUnauthorized:false.
@@ -132,23 +139,63 @@ function camelizeRow(row) {
 
 const camelizeRows = rows => (Array.isArray(rows) ? rows.map(camelizeRow) : rows);
 
+// Connection-saturation / transient network errors that are safe to retry with
+// a short backoff. These fail BEFORE the statement is executed (pooler refusal,
+// handshake timeout, socket reset), so retrying cannot duplicate an INSERT.
+// Query-level errors (constraint violations, syntax errors, …) are NOT retried.
+function isTransientConnectionError(err) {
+  if (!err) return false;
+  const msg = String(err.message || '');
+  const code = err.code || '';
+  return (
+    msg.includes('EMAXCONNSESSION') ||            // Supabase session-pooler at capacity
+    msg.includes('timeout exceeded when trying to connect') ||
+    msg.includes('Connection terminated') ||
+    msg.includes('connection refused') ||
+    msg.includes('connect ETIMEDOUT') ||
+    msg.includes('ECONNRESET') ||
+    msg.includes('ETIMEDOUT') ||
+    msg.includes('53300') ||                       // too_many_connections (Postgres)
+    msg.includes('too many clients') ||
+    code === 'ECONNRESET' || code === 'ETIMEDOUT' || code === 'EPIPE'
+  );
+}
+
+/** Run `fn` with up to `attempts` tries on transient connection errors. */
+async function withRetry(fn, attempts = 3) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientConnectionError(err) || i === attempts - 1) throw err;
+      await new Promise(r => setTimeout(r, 150 * (i + 1))); // 150ms, 300ms backoff
+    }
+  }
+  throw lastErr;
+}
+
 /** Low-level query — returns the full pg result ({ rows, rowCount, … }). */
 export async function query(text, params = []) {
-  const res = await pool.query(toPgSql(text), params);
-  res.rows = camelizeRows(res.rows);
-  return res;
+  const sql = toPgSql(text);
+  return withRetry(async () => {
+    const res = await pool.query(sql, params);
+    res.rows = camelizeRows(res.rows);
+    return res;
+  });
 }
 
 /** All rows as an array of plain objects. */
 export async function all(text, params = []) {
-  const res = await pool.query(toPgSql(text), params);
-  return camelizeRows(res.rows);
+  const sql = toPgSql(text);
+  return withRetry(async () => camelizeRows((await pool.query(sql, params)).rows));
 }
 
 /** First row or undefined (same as better-sqlite3's stmt.get()). */
 export async function get(text, params = []) {
-  const res = await pool.query(toPgSql(text), params);
-  return camelizeRow(res.rows[0]);
+  const sql = toPgSql(text);
+  return withRetry(async () => camelizeRow((await pool.query(sql, params)).rows[0]));
 }
 
 /** Execute INSERT/UPDATE/DELETE — returns { changes, lastInsertRowid }.
@@ -160,13 +207,15 @@ export async function run(text, params = []) {
   const isInsert = /^\s*insert\b/i.test(sql);
   const hasReturning = /\breturning\b/i.test(sql);
   const finalSql = isInsert && !hasReturning ? `${sql} RETURNING *` : sql;
-  const res = await pool.query(finalSql, params);
-  const rows = res.rows || [];
-  const lastRow = rows[rows.length - 1];
-  return {
-    changes: res.rowCount ?? 0,
-    lastInsertRowid: isInsert && rows.length && lastRow?.id != null ? Number(lastRow.id) : 0,
-  };
+  return withRetry(async () => {
+    const res = await pool.query(finalSql, params);
+    const rows = res.rows || [];
+    const lastRow = rows[rows.length - 1];
+    return {
+      changes: res.rowCount ?? 0,
+      lastInsertRowid: isInsert && rows.length && lastRow?.id != null ? Number(lastRow.id) : 0,
+    };
+  });
 }
 
 /** Run one or more ;-separated statements (DDL / deletes, no params). */
@@ -176,7 +225,7 @@ export async function exec(text) {
     .map(s => s.trim())
     .filter(Boolean);
   for (const stmt of statements) {
-    await pool.query(stmt);
+    await withRetry(() => pool.query(stmt));
   }
   return { changes: statements.length };
 }
@@ -192,7 +241,9 @@ export async function exec(text) {
  */
 export function transaction(fn) {
   return async (...args) => {
-    const client = await pool.connect();
+    // Retry only the connect step (pooler saturation happens before BEGIN);
+    // once the transaction has started, a failure must propagate as-is.
+    const client = await withRetry(() => pool.connect());
     const bind = {
       query: (s, p = []) => client.query(toPgSql(s), p).then(r => { r.rows = camelizeRows(r.rows); return r; }),
       all: async (s, p = []) => camelizeRows((await client.query(toPgSql(s), p)).rows),

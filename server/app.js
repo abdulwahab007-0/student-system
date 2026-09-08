@@ -48,8 +48,24 @@ if (useSupabase) {
 }
 
 // ── Initialise database (idempotent — safe to call on every cold start) ──
-await initDatabase();
-await seedDatabase();
+// IMPORTANT: Vercel runs this at *module scope* on every cold start. If the
+// Supabase pooler momentarily refuses a connection here (transient hiccup), an
+// UNHANDLED top-level await rejection crashes the whole serverless function
+// before Express's error handler exists — the platform then returns a bare 500
+// ("FUNCTION_INVOCATION_FAILED" / "A server error has occurred") with no JSON
+// error body. Both initDatabase() and seedDatabase() are internally guarded
+// (idempotent schema, seed only when empty), so it's safe to swallow and retry
+// here: a later warm request will then succeed normally.
+try {
+  await initDatabase();
+} catch (err) {
+  console.error('[init] initDatabase failed (will retry on next invocation):', err.message);
+}
+try {
+  await seedDatabase();
+} catch (err) {
+  console.error('[init] seedDatabase failed (will retry on next invocation):', err.message);
+}
 
 // ── Routes ──────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
