@@ -243,7 +243,7 @@ function Dashboard() {
         <>
           <div className="stats-grid">
             <div className="stat-card">
-              <div className="stat-icon blue">👨🎓</div>
+              <div className="stat-icon blue">🧑‍🎓</div>
               <div className="stat-info">
                 <h3>{totalStudents}</h3>
                 <p>{role === 'cr_admin' ? `Students in ${userClass || 'my class'}` : 'Total Students'}</p>
@@ -251,7 +251,7 @@ function Dashboard() {
               </div>
             </div>
             <div className="stat-card">
-              <div className="stat-icon green">👩🏫</div>
+              <div className="stat-icon green">🧑‍🏫</div>
               <div className="stat-info">
                 <h3>{totalTeachers}</h3>
                 <p>{role === 'teacher_admin' ? 'My Teaching Load' : 'Total Teachers'}</p>
