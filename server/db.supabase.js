@@ -39,13 +39,17 @@ if (!connectionString) {
 
 export const pool = new pg.Pool({
   connectionString,
-  // Keep max small: Supabase's *session-mode* pooler (`:5432`) caps the whole
-  // project at pool_size: 15 concurrent clients. Vercel spins up a *fresh* pool
-  // per cold-start instance, and several instances booting at once can exhaust
-  // the pooler (→ EMAXCONNSESSION). A smaller max per instance means the first
-  // request of a cold start gets a connection promptly instead of queuing while
-  // idle sockets pile up. This is not a throughput bottleneck: a serverless
-  // instance handles a handful of concurrent requests at most.
+  // Keep max small: with the *session-mode* pooler (`:5432`) the whole project
+  // is capped at pool_size: 15 concurrent backends. Vercel spins up a *fresh*
+  // pool per cold-start instance, and several instances booting at once can
+  // exhaust the session cap (→ EMAXCONNSESSION). Keep `max` small so the first
+  // request of a cold start gets a connection promptly instead of queuing.
+  //
+  // If you switch to the *transaction-mode* pooler (`:6543`) — recommended for
+  // Vercel/serverless, see .env.example — the cap is far higher and this pool
+  // still works identically: node-postgres checks out a connection per query,
+  // which matches the transaction pooler, and the `transaction()` helper pins a
+  // single backend via BEGIN/COMMIT as expected. No behavior change needed.
   max: 4,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 10_000,
