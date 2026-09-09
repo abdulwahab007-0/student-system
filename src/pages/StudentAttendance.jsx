@@ -120,29 +120,27 @@ function StudentAttendance() {
   }, [records, status, presence]);
 
   const summary = useMemo(() => {
-    // Classify each record into exactly ONE bucket so the counts partition the
-    // total and the attendance rate can never exceed 100%.
+    // Presence in class only counts once a record is APPROVED. A student who is
+    // in class but marked late still counts as present (they attended, just late).
+    // Records that are pending / rejected / absent are NOT present — a student is
+    // not considered present until an admin approves the attendance.
     const total = filtered.length;
     let present = 0, late = 0, absent = 0, pending = 0, approved = 0;
     filtered.forEach(r => {
       const presence = r.presence;
       const status = r.status;
-      if (presence === 'absent' || status === 'absent' || status === 'rejected') {
-        // Auto-generated absent slot, or the student was marked absent/rejected
+      if (status === 'pending' || presence === 'absent' || status === 'absent' || status === 'rejected') {
+        // Awaiting approval, auto-generated absent slot, or rejected → not present
+        if (status === 'pending') pending++;
         absent++;
-      } else if (status === 'pending') {
-        // Marked present but awaiting admin decision — still attended
-        pending++;
-        present++;
-      } else if (presence === 'late') {
-        late++;
-      } else {
-        // Approved (or physically present): presence present && status approved
-        present++;
-        if (status === 'approved') approved++;
+        return;
       }
+      // Approved: physically present (the student was in class, even if late)
+      approved++;
+      present++;
+      if (presence === 'late') late++;
     });
-    const rate = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
+    const rate = total > 0 ? Math.round((present / total) * 100) : 0;
     return { total, present, late, absent, pending, approved, rate };
   }, [filtered]);
 

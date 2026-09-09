@@ -78,13 +78,20 @@ function MyAttendance() {
   [records, fromDate, toDate, presence]);
 
   const summary = useMemo(() => {
+    // A student is only PRESENT once the record is APPROVED. Being in class late
+    // still counts as present (they attended). Pending / rejected / absent marks
+    // are NOT present until an admin approves the attendance.
     const total = filtered.length;
-    const present = filtered.filter(r => r.presence === 'present' || r.status === 'approved').length;
-    const late = filtered.filter(r => r.presence === 'late' || r.status === 'late').length;
-    const absent = filtered.filter(r => r.presence === 'absent' || r.status === 'rejected').length;
+    const present = filtered.filter(
+      r => r.status === 'approved' && (r.presence === 'present' || r.presence === 'late')
+    ).length;
+    const late = filtered.filter(r => r.status === 'approved' && r.presence === 'late').length;
+    const absent = filtered.filter(
+      r => r.status === 'pending' || r.presence === 'absent' || r.status === 'absent' || r.status === 'rejected'
+    ).length;
     const pending = filtered.filter(r => r.status === 'pending').length;
     const approved = filtered.filter(r => r.status === 'approved').length;
-    const rate = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
+    const rate = total > 0 ? Math.round((present / total) * 100) : 0;
     return { total, present, late, absent, pending, approved, rate };
   }, [filtered]);
 

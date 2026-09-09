@@ -488,12 +488,20 @@ function AdminReview({ canApprove }) {
     } catch (err) { showToast(err.message, 'error'); }
   };
 
-  const summary = useMemo(() => ({
-    present: records.filter(r => r.status === 'present' || r.status === 'approved').length,
-    late: records.filter(r => r.status === 'late').length,
-    pending: records.filter(r => r.status === 'pending').length,
-    rejected: records.filter(r => r.status === 'rejected').length,
-  }), [records]);
+  const summary = useMemo(() => {
+    // A student is only PRESENT once the record is APPROVED (late still counts as
+    // present — they attended). Pending / rejected / absent are NOT present.
+    const present = records.filter(
+      r => r.status === 'approved' && (r.presence === 'present' || r.presence === 'late')
+    ).length;
+    const late = records.filter(r => r.status === 'approved' && r.presence === 'late').length;
+    const pending = records.filter(r => r.status === 'pending').length;
+    const rejected = records.filter(r => r.status === 'rejected').length;
+    const absent = records.filter(
+      r => r.presence === 'absent' || r.status === 'absent' || r.status === 'rejected'
+    ).length;
+    return { present, late, pending, rejected, absent };
+  }, [records]);
 
   return (
     <div>

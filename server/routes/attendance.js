@@ -466,7 +466,7 @@ router.get('/report', requirePermission('view_attendance_report'), async (req, r
         s.id AS studentId, s.name AS studentName, s.rollNo, s.className,
         COUNT(a.id) AS totalDays,
         SUM(CASE WHEN a.status IN ('approved', 'present') THEN 1 ELSE 0 END) AS approvedDays,
-        SUM(CASE WHEN a.status = 'late' THEN 1 ELSE 0 END) AS lateDays,
+        SUM(CASE WHEN a.status = 'approved' AND a.presence = 'late' THEN 1 ELSE 0 END) AS lateDays,
         SUM(CASE WHEN a.status = 'rejected' THEN 1 ELSE 0 END) AS rejectedDays,
         SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) AS absentDays,
         SUM(CASE WHEN a.status = 'pending' THEN 1 ELSE 0 END) AS pendingDays
