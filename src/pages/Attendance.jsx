@@ -41,12 +41,10 @@ function getTodayDayName() {
 // ── Student: Mark Attendance ──
 function StudentMark({ student }) {
   const showToast = useToast();
-  const { subjects } = useData();
   const [classSchedule, setClassSchedule] = useState(null);
   const [geofences, setGeofences] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState(null);
-  const [selectedSubject, setSelectedSubject] = useState('');
   const [coords, setCoords] = useState(null);
   const [locating, setLocating] = useState(false);
   const [marking, setMarking] = useState(false);
@@ -56,6 +54,11 @@ function StudentMark({ student }) {
   const today = getTodayDateISO();
   const todayName = getTodayDayName();
   const todayPeriods = classSchedule?.structure?.days?.find(d => d.name === todayName)?.periods || [];
+  // Subject is auto-derived from the class schedule for the selected period —
+  // students cannot change it when marking attendance.
+  const scheduleSubject = (selectedPeriod != null)
+    ? (classSchedule?.slots?.[`${todayName}_${selectedPeriod}`]?.subject || '')
+    : '';
 
   const loadMyRecords = async () => {
     try {
@@ -112,7 +115,7 @@ function StudentMark({ student }) {
     try {
       const data = await api.markAttendance({
         className: selectedClass,
-        subject: selectedSubject || null,
+        subject: scheduleSubject || null,
         day: todayName,
         periodIndex: selectedPeriod,
         scheduledDate: today,
@@ -121,7 +124,6 @@ function StudentMark({ student }) {
       });
       setResult(data);
       setSelectedPeriod(null);
-      setSelectedSubject('');
       setCoords(null);
       loadMyRecords();
     } catch (err) {
@@ -231,13 +233,15 @@ function StudentMark({ student }) {
                 <input type="text" value={`${ORDINALS[selectedPeriod]} — ${todayPeriods[selectedPeriod]}`} readOnly style={{ background: 'var(--gray-bg)' }} />
               </div>
               <div className="form-group" style={{ margin: 0 }}>
-                <label>Subject (optional)</label>
-                <select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)}>
-                  <option value="">Select subject...</option>
-                  {subjects.filter(s => !selectedClass || s.className === selectedClass).map(s => (
-                    <option key={s.id} value={s.name}>{s.name} ({s.code})</option>
-                  ))}
-                </select>
+                <label>Subject</label>
+                <input
+                  type="text"
+                  value={scheduleSubject || 'No subject scheduled for this period'}
+                  readOnly
+                  disabled
+                  style={{ background: 'var(--gray-bg)' }}
+                  title="This subject is set by the class schedule and cannot be changed."
+                />
               </div>
             </div>
 
@@ -317,7 +321,7 @@ function StudentMark({ student }) {
               <button className="btn btn-primary" onClick={handleMark} disabled={marking} style={{ minWidth: '140px', justifyContent: 'center' }}>
                 <Icon name="check" size={16} /> {marking ? 'Submitting...' : 'Mark Attendance'}
               </button>
-              <button className="btn btn-secondary" onClick={() => { setSelectedPeriod(null); setCoords(null); setResult(null); setSelectedSubject(''); }}>
+              <button className="btn btn-secondary" onClick={() => { setSelectedPeriod(null); setCoords(null); setResult(null); }}>
                 Cancel
               </button>
             </div>
