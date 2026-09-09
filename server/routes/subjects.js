@@ -5,6 +5,21 @@ const router = Router();
 
 router.get('/', requirePermission('view_subjects'), async (req, res) => {
   const rows = await db.all('SELECT * FROM subjects ORDER BY id');
+
+  // ── Student role: only subjects assigned to the student's own class ──
+  // Enforced server-side so every portal student account is covered regardless
+  // of what the client requests. Class matching is case-insensitive so records
+  // like "ADPSe" vs subjects tagged "ADPSE" still match.
+  if (req.user && req.user.role === 'student') {
+    const me = await db.get('SELECT className FROM users WHERE id = ?', [req.user.id]);
+    const cls = (me && me.className ? String(me.className) : '').trim().toLowerCase();
+    if (!cls) return res.json([]);
+    return res.json(rows.filter(s => {
+      const tags = (s.className || '').split(',').map(c => c.trim().toLowerCase());
+      return tags.includes(cls);
+    }));
+  }
+
   res.json(rows);
 });
 

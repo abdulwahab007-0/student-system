@@ -188,6 +188,7 @@ function Subjects() {
   // subjects (and the matching BSCS option) on first load even though the
   // /classes endpoint (view_classes) is off-limits to the student role.
   const studentClass = (currentUser?.className || '').trim();
+  const studentClassLower = studentClass.toLowerCase();
   const [filterClass, setFilterClass] = useState(() =>
     currentUser?.role === 'student' ? studentClass : ''
   );
@@ -196,11 +197,18 @@ function Subjects() {
   const [editingSubject, setEditingSubject] = useState(null);
   const [deletingSubject, setDeletingSubject] = useState(null);
 
+  // Class-tag helpers — matching is case-insensitive so portal accounts with
+  // e.g. "ADPSe" still match subjects tagged "ADPSE", while the dropdown keeps
+  // the original (display) casing.
+  const classTagsIn = (subject) =>
+    (subject.className || '').split(',').map(c => c.trim()).filter(Boolean);
+  const classTagsLowerIn = (subject) => classTagsIn(subject).map(c => c.toLowerCase());
+
   // Role-based filtering
   const visibleSubjects = currentUser?.role === 'teacher_admin'
     ? subjects.filter(s => (s.teacher || '').includes(currentUser?.fullName || ''))
     : currentUser?.role === 'student'
-      ? subjects.filter(s => (s.className || '').split(',').map(c => c.trim()).includes(studentClass))
+      ? subjects.filter(s => classTagsLowerIn(s).includes(studentClassLower))
       : subjects;
 
   const filteredSubjects = visibleSubjects.filter(s => {
@@ -208,12 +216,12 @@ function Subjects() {
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.code.toLowerCase().includes(search.toLowerCase()) ||
       s.teacher.toLowerCase().includes(search.toLowerCase());
-    const matchesClass = !filterClass || (s.className || '').split(',').map(c => c.trim()).includes(filterClass);
+    const matchesClass = !filterClass || classTagsLowerIn(s).includes(filterClass.toLowerCase());
     return matchesSearch && matchesClass;
   });
 
   const filterClassOptions = [...new Set(
-    visibleSubjects.flatMap(s => (s.className || '').split(',').map(c => c.trim()).filter(Boolean))
+    visibleSubjects.flatMap(s => classTagsIn(s))
   )].sort();
   const classSuggestions = getAllClassSuggestions(classes, students, teachers, subjects);
 

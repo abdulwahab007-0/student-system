@@ -5,6 +5,22 @@ const router = Router();
 
 router.get('/', requirePermission('view_marks'), async (req, res) => {
   const rows = await db.all('SELECT * FROM marks ORDER BY id');
+
+  // ── Student role: only the student's OWN marks ──
+  // Enforced server-side so every portal student account only ever receives
+  // their own grade records (matched by linked student id, falling back to a
+  // name match). Nobody else's marks leave the API for a student session.
+  if (req.user && req.user.role === 'student') {
+    const me = await db.get('SELECT linkedStudentId, fullName FROM users WHERE id = ?', [req.user.id]);
+    const linkedId = me && me.linkedStudentId != null ? Number(me.linkedStudentId) : null;
+    const myName = (me && me.fullName ? String(me.fullName) : '').trim().toLowerCase();
+    return res.json(rows.filter(m => {
+      const byId = linkedId != null && Number(m.studentId) === linkedId;
+      const byName = !!myName && String(m.studentName || '').trim().toLowerCase() === myName;
+      return byId || byName;
+    }));
+  }
+
   res.json(rows);
 });
 

@@ -236,16 +236,36 @@ function Marks() {
   // Determine visible students (for student role, only themselves; for CR, only their class)
   let roleVisibleStudents = students;
   if (role === 'student') {
-    roleVisibleStudents = students.filter(s =>
-      s.name.toLowerCase().includes(currentUser?.fullName?.toLowerCase() || '')
-    );
+    // The /students endpoint is off-limits to students (403), so build the
+    // student's own profile from the logged-in portal account — exactly like
+    // the Dashboard's synthetic record. This guarantees a student only ever
+    // sees THEIR OWN record on the Marks page.
+    roleVisibleStudents = currentUser?.fullName
+      ? [{
+          id: currentUser.linkedStudentId,
+          name: currentUser.fullName,
+          className: currentUser.className,
+          rollNo: currentUser.rollNo || '',
+          email: currentUser.email,
+          status: 'Active',
+        }]
+      : [];
   } else if (role === 'cr_admin' && !currentUser?.manageAllClasses) {
     roleVisibleStudents = students.filter(s => s.className === userClass);
   }
 
   // Determine visible marks
   let roleVisibleMarks = marks;
-  if (role === 'student' || role === 'cr_admin') {
+  if (role === 'student') {
+    // Match the student's own marks by linked student id or name. The server
+    // already scopes /marks for students; this is a second safety layer.
+    const myId = currentUser?.linkedStudentId != null ? Number(currentUser.linkedStudentId) : null;
+    const myName = (currentUser?.fullName || '').trim().toLowerCase();
+    roleVisibleMarks = marks.filter(m =>
+      (myId != null && Number(m.studentId) === myId) ||
+      (!!myName && String(m.studentName || '').trim().toLowerCase() === myName)
+    );
+  } else if (role === 'cr_admin') {
     const validStudentIds = roleVisibleStudents.map(s => s.id);
     roleVisibleMarks = marks.filter(m => validStudentIds.includes(m.studentId));
   } else if (role === 'teacher_admin') {

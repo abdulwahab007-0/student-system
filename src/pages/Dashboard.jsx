@@ -89,8 +89,9 @@ function Dashboard() {
 
   // For student role, use the own marks already derived above
   const myMarks = isStudent ? visibleMarksForRole : [];
+  const myClassLower = (currentUser?.className || '').trim().toLowerCase();
   const mySubjects = isStudent
-    ? subjects.filter(s => (s.className || '').split(',').map(c => c.trim()).includes(myStudentData?.className || currentUser?.className))
+    ? subjects.filter(s => (s.className || '').split(',').map(c => c.trim().toLowerCase()).includes(myClassLower))
     : [];
   const myAverage = getStudentAverage(myMarks);
 

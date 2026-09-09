@@ -230,7 +230,7 @@ function ClassSchedule() {
     setSelectedClass(name);
   };
 
-  const classSubjects = subjects.filter(s => (s.className || '').split(',').map(c => c.trim()).includes(selectedClass));
+  const classSubjects = subjects.filter(s => (s.className || '').split(',').map(c => c.trim().toLowerCase()).includes((selectedClass || '').toLowerCase()));
   const displaySubjects = classSubjects.length > 0 ? classSubjects : subjects;
   // For students the /classes endpoint returns 403 (view_classes is admin-only),
   // so `classes` is empty here. Inject a synthetic entry for the student's own
