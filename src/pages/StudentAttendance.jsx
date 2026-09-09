@@ -59,10 +59,10 @@ function StudentAttendance() {
   const [status, setStatus] = useState('');
   const [presence, setPresence] = useState('');
 
-  // Default to the last 30 days on first render
+    // Default to yesterday → today on first render
   useEffect(() => {
     if (!fromDate || !toDate) {
-      setFromDate(toDateISO(new Date(Date.now() - 30 * 86400000)));
+      setFromDate(toDateISO(new Date(Date.now() - 1 * 86400000)));
       setToDate(toDateISO(new Date()));
     }
   }, [fromDate, toDate]);

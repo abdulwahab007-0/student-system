@@ -48,7 +48,7 @@ function MyAttendance() {
 
   useEffect(() => {
     if (!fromDate || !toDate) {
-      setFromDate(toDateISO(new Date(Date.now() - 30 * 86400000)));
+      setFromDate(toDateISO(new Date(Date.now() - 1 * 86400000)));
       setToDate(toDateISO(new Date()));
     }
   }, [fromDate, toDate]);
