@@ -137,6 +137,24 @@ function Layout() {
           </div>
         </div>
 
+        {/* User profile (top, next to brand — like the Pinterest dashboard) */}
+        <div className="sidebar-user-card sidebar-user-card-top">
+          <div className="sidebar-user-avatar">
+            {currentUser?.fullName?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+          </div>
+          <div className="sidebar-user-info">
+            <span className="sidebar-user-name">{currentUser?.fullName}</span>
+            <span className="sidebar-user-role">{currentUser ? roleLabel(currentUser.role) : ''}</span>
+          </div>
+          <button
+            className="sidebar-theme-toggle"
+            onClick={toggleTheme}
+            title={darkMode ? 'Light Mode' : 'Dark Mode'}
+          >
+            <Icon name={darkMode ? 'sun' : 'moon'} size={18} />
+          </button>
+        </div>
+
         <LanInfoBanner />
 
         {/* Navigation */}
@@ -164,24 +182,8 @@ function Layout() {
           ))}
         </nav>
 
-        {/* Sidebar footer – user card + actions */}
-        <div className="sidebar-footer">
-          <div className="sidebar-user-card">
-            <div className="sidebar-user-avatar">
-              {currentUser?.fullName?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
-            </div>
-            <div className="sidebar-user-info">
-              <span className="sidebar-user-name">{currentUser?.fullName}</span>
-              <span className="sidebar-user-role">{currentUser ? roleLabel(currentUser.role) : ''}</span>
-            </div>
-            <button
-              className="sidebar-theme-toggle"
-              onClick={toggleTheme}
-              title={darkMode ? 'Light Mode' : 'Dark Mode'}
-            >
-              <Icon name={darkMode ? 'sun' : 'moon'} size={18} />
-            </button>
-          </div>
+        {/* Sidebar footer – actions */}
+        <div className="sidebar-footer sidebar-footer-actions">
           <div className="sidebar-actions">
             <button className="sidebar-action-btn" onClick={() => setShowChangePassword(true)}>
               <Icon name="lock" size={18} />

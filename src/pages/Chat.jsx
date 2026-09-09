@@ -10,7 +10,7 @@ function getInitials(name) {
 }
 
 function getAvatarColor(name) {
-  if (!name) return '#059669';
+  if (!name) return '#7c3aed';
   const sum = name.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   return AVATAR_COLORS[sum % AVATAR_COLORS.length];
 }
@@ -41,7 +41,7 @@ function formatDateSeparator(dateStr) {
 }
 
 const ROLE_BADGE_COLORS = {
-  super_admin: { bg: '#ecfdf5', color: '#059669', label: 'Admin' },
+  super_admin: { bg: '#f5f3ff', color: '#6d28d9', label: 'Admin' },
   cr_admin: { bg: '#fff7ed', color: '#c2410c', label: 'CR Admin' },
   teacher_admin: { bg: '#f5f3ff', color: '#6d28d9', label: 'Teacher' },
   student: { bg: '#eff6ff', color: '#2563eb', label: 'Student' },

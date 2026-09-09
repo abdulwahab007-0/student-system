@@ -12,7 +12,7 @@ function getInitials(name) {
 }
 
 function getAvatarColor(name) {
-  if (!name) return '#059669';
+  if (!name) return '#7c3aed';
   const sum = name.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   return avatarColors[sum % avatarColors.length];
 }

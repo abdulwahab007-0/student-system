@@ -9,7 +9,7 @@ import Icon from '../components/Icon';
 import ImportModal from '../components/ImportModal';
 
 const subjectColors = {
-  'Mathematics': '#059669',
+  'Mathematics': '#6d28d9',
   'Physics': '#0284c7',
   'Chemistry': '#16a34a',
   'Biology': '#d97706',
@@ -21,7 +21,7 @@ const subjectColors = {
 };
 
 function getSubjectColor(name) {
-  return subjectColors[name] || '#059669';
+  return subjectColors[name] || '#7c3aed';
 }
 
 const emptySubject = {

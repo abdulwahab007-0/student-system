@@ -3,21 +3,21 @@
 :root {
   /* ═════════════════════════════════════════════════════════════
      NCBA & E Design System — LIGHT MODE
-     Canvas: #F8FAFC · Surface: #FFFFFF · Accent: Emerald #059669
+     Canvas: #F8FAFC · Surface: #FFFFFF · Accent: Violet #7C3AED
      Text: #0F172A (primary) · #64748B (muted)
      ═════════════════════════════════════════════════════════════ */
-  --primary: #059669;            /* Emerald-600 — high-contrast accent on light */
-  --primary-light: #10b981;      /* Emerald-500 */
-  --primary-dark: #047857;       /* Emerald-700 */
-  --primary-bg: #ecfdf5;         /* Emerald-50 soft tint */
+  --primary: #7c3aed;            /* Violet-600 — high-contrast accent on light */
+  --primary-light: #8b5cf6;      /* Violet-500 */
+  --primary-dark: #6d28d9;       /* Violet-700 */
+  --primary-bg: #f5f3ff;         /* Violet-50 soft tint */
   --secondary: #0ea5e9;          /* Sky-500 */
   --secondary-light: #38bdf8;    /* Sky-400 */
   --secondary-bg: #e0f2fe;       /* Sky-100 */
   --accent: #d97706;             /* Amber-600 */
   --accent-light: #f59e0b;       /* Amber-500 */
   --accent-bg: #fef3c7;          /* Amber-100 */
-  --success: #059669;            /* Emerald-600 */
-  --success-bg: #d1fae5;         /* Emerald-100 */
+  --success: #059669;            /* Green-600 — success/approved */
+  --success-bg: #d1fae5;         /* Green-100 */
   --warning: #d97706;
   --warning-bg: #fef3c7;
   --danger: #dc2626;
@@ -33,40 +33,40 @@
   --shadow: 0 1px 3px 0 rgb(15 23 42 / 0.08), 0 1px 2px -1px rgb(15 23 42 / 0.07);
   --shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.06);
   --shadow-lg: 0 10px 15px -3px rgb(15 23 42 / 0.1), 0 4px 6px -4px rgb(15 23 42 / 0.08);
-  --gradient-primary: linear-gradient(135deg, #047857 0%, #059669 50%, #10b981 100%);
-  --gradient-sidebar: linear-gradient(180deg, #047857 0%, #059669 60%, #047857 100%);
+  --gradient-primary: linear-gradient(135deg, #6d28d9 0%, #7c3aed 50%, #8b5cf6 100%);
+  --gradient-sidebar: linear-gradient(180deg, #0f172a 0%, #131c31 60%, #0f172a 100%);
 
-  /* Sidebar — LIGHT: clean white canvas w/ soft faint right separator */
-  --sidebar-bg-start: #ffffff;
-  --sidebar-bg-mid: #ffffff;
-  --sidebar-bg-end: #ffffff;
-  --sidebar-border: #f1f5f9;             /* very soft faint separator */
-  --sidebar-text: #64748b;
-  --sidebar-text-hover: #0f172a;
-  --sidebar-text-active: #0f172a;
-  --sidebar-link-hover: #f1f5f9;
-  --sidebar-link-active-bg: #ecfdf5;     /* emerald-50 active wash */
-  --sidebar-section-label: #94a3b8;
-  --sidebar-accent: #059669;
-  --sidebar-glow: rgba(5, 150, 105, 0.35);
-  --sidebar-card-bg: #f8fafc;
-  --sidebar-card-border: #e2e8f0;
-  --sidebar-brand-sub: #94a3b8;
-  --sidebar-action-text: #64748b;
-  --sidebar-action-hover: #f1f5f9;
-  --sidebar-action-hover-text: #0f172a;
+  /* Sidebar — LIGHT: deep navy sidebar with purple accent (matches dark Pinterest dashboard) */
+  --sidebar-bg-start: #0f172a;
+  --sidebar-bg-mid: #131c31;
+  --sidebar-bg-end: #0f172a;
+  --sidebar-border: rgba(124, 58, 237, 0.1);
+  --sidebar-text: #94a3b8;
+  --sidebar-text-hover: #f1f5f9;
+  --sidebar-text-active: #f1f5f9;
+  --sidebar-link-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-link-active-bg: rgba(124, 58, 237, 0.15);
+  --sidebar-section-label: rgba(148, 163, 184, 0.45);
+  --sidebar-accent: #7c3aed;
+  --sidebar-glow: rgba(124, 58, 237, 0.35);
+  --sidebar-card-bg: rgba(255, 255, 255, 0.04);
+  --sidebar-card-border: rgba(255, 255, 255, 0.06);
+  --sidebar-brand-sub: rgba(148, 163, 184, 0.6);
+  --sidebar-action-text: #94a3b8;
+  --sidebar-action-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-action-hover-text: #f1f5f9;
   --sidebar-user-role: #94a3b8;
-  --sidebar-theme-bg: #f8fafc;
-  --sidebar-theme-border: #e2e8f0;
-  --sidebar-theme-text: #64748b;
-  --sidebar-theme-hover-bg: #ecfdf5;
-  --sidebar-theme-hover-text: #059669;
-  --sidebar-logout-hover: #fef2f2;
-  --sidebar-logout-hover-text: #dc2626;
-  --sidebar-overlay-bg: rgba(15, 23, 42, 0.45);
-  --sidebar-scrollbar: #cbd5e1;
-  --sidebar-edge-fade: linear-gradient(90deg, transparent 85%, var(--light-gray) 100%);
-  --sidebar-shadow: none;
+  --sidebar-theme-bg: rgba(255, 255, 255, 0.06);
+  --sidebar-theme-border: rgba(255, 255, 255, 0.08);
+  --sidebar-theme-text: #94a3b8;
+  --sidebar-theme-hover-bg: rgba(124, 58, 237, 0.12);
+  --sidebar-theme-hover-text: #a78bfa;
+  --sidebar-logout-hover: rgba(239, 68, 68, 0.1);
+  --sidebar-logout-hover-text: #fca5a5;
+  --sidebar-overlay-bg: rgba(2, 6, 23, 0.6);
+  --sidebar-scrollbar: rgba(148, 163, 184, 0.2);
+  --sidebar-edge-fade: linear-gradient(90deg, transparent 90%, transparent 100%);
+  --sidebar-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
 
   /* Role color tokens — light mode */
   --role-cr-admin-bg: #fff7ed;         /* Orange-50 */
@@ -75,9 +75,9 @@
   --role-teacher-admin-fg: #6d28d9;    /* Violet-700 — high-contrast on light */
 
   /* UI state tokens — light mode */
-  --selection-ring: rgba(5, 150, 105, 0.2);
-  --dirty-row-bg: rgba(5, 150, 105, 0.05);
-  --dirty-cell-bg: rgba(5, 150, 105, 0.1);
+  --selection-ring: rgba(124, 58, 237, 0.2);
+  --dirty-row-bg: rgba(124, 58, 237, 0.05);
+  --dirty-cell-bg: rgba(124, 58, 237, 0.1);
   --info-bar-border: rgba(124, 58, 237, 0.15);
 }
 
@@ -85,21 +85,21 @@
 .dark {
   /* ═════════════════════════════════════════════════════════════
      NCBA & E Design System — DARK MODE
-     Canvas: #0F172A · Surface: #1E293B · Accent: Emerald #34D399
+     Canvas: #0F172A · Surface: #1E293B · Accent: Violet #A78BFA
      Text: #F8FAFC (primary) · #94A3B8 (muted)
      ═════════════════════════════════════════════════════════════ */
-  --primary: #34d399;          /* Emerald-400 — pure accent/active on dark */
-  --primary-light: #6ee7b7;    /* Emerald-300 */
-  --primary-dark: #10b981;     /* Emerald-500 */
-  --primary-bg: #064e3b;       /* Emerald-900 — tinted active wash */
+  --primary: #a78bfa;          /* Violet-400 — pure accent/active on dark */
+  --primary-light: #c4b5fd;    /* Violet-300 */
+  --primary-dark: #8b5cf6;     /* Violet-500 */
+  --primary-bg: #2e1065;       /* Violet-950 — tinted active wash */
   --secondary: #38bdf8;        /* Sky-400 */
   --secondary-light: #7dd3fc;  /* Sky-300 */
   --secondary-bg: #164e63;     /* Sky-900 */
   --accent: #fbbf24;           /* Amber-400 */
   --accent-light: #fcd34d;     /* Amber-300 */
   --accent-bg: #451a03;        /* Amber-950 */
-  --success: #34d399;          /* Emerald-400 — success */
-  --success-bg: #064e3b;       /* Emerald-900 */
+  --success: #34d399;          /* Green-400 — success */
+  --success-bg: #064e3b;       /* Green-900 */
   --warning: #fbbf24;          /* Amber-400 */
   --warning-bg: #451a03;       /* Amber-950 */
   --danger: #f87171;           /* Red-400 */
@@ -115,40 +115,40 @@
   --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.5);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.5);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.5);
-  --gradient-primary: linear-gradient(135deg, #10b981 0%, #34d399 50%, #6ee7b7 100%);
-  --gradient-sidebar: linear-gradient(180deg, #090d16 0%, #0a1820 60%, #090d16 100%);
+  --gradient-primary: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 50%, #c4b5fd 100%);
+  --gradient-sidebar: linear-gradient(180deg, #090d18 0%, #0c1020 60%, #090d18 100%);
 
-  /* Sidebar — DARK: #090D16 canvas blending into #0F172A bg */
-  --sidebar-bg-start: #0b1220;
-  --sidebar-bg-mid: #0c1423;
-  --sidebar-bg-end: #0b1220;
-  --sidebar-border: rgba(148, 163, 184, 0.06);
+  /* Sidebar — DARK: deep navy with purple accent (#7c3aed / #a78bfa) */
+  --sidebar-bg-start: #090d18;
+  --sidebar-bg-mid: #0c1020;
+  --sidebar-bg-end: #090d18;
+  --sidebar-border: rgba(124, 58, 237, 0.08);
   --sidebar-text: #94a3b8;
   --sidebar-text-hover: #f1f5f9;
-  --sidebar-text-active: #34d399;
-  --sidebar-link-hover: rgba(148, 163, 184, 0.06);
-  --sidebar-link-active-bg: rgba(52, 211, 153, 0.08);
-  --sidebar-section-label: rgba(148, 163, 184, 0.4);
-  --sidebar-accent: #34d399;
-  --sidebar-glow: rgba(52, 211, 153, 0.2);
-  --sidebar-card-bg: rgba(148, 163, 184, 0.04);
-  --sidebar-card-border: rgba(148, 163, 184, 0.06);
-  --sidebar-brand-sub: rgba(148, 163, 184, 0.6);
+  --sidebar-text-active: #c4b5fd;
+  --sidebar-link-hover: rgba(124, 58, 237, 0.06);
+  --sidebar-link-active-bg: rgba(124, 58, 237, 0.12);
+  --sidebar-section-label: rgba(148, 163, 184, 0.35);
+  --sidebar-accent: #7c3aed;
+  --sidebar-glow: rgba(124, 58, 237, 0.25);
+  --sidebar-card-bg: rgba(124, 58, 237, 0.04);
+  --sidebar-card-border: rgba(124, 58, 237, 0.08);
+  --sidebar-brand-sub: rgba(148, 163, 184, 0.5);
   --sidebar-action-text: #94a3b8;
-  --sidebar-action-hover: rgba(148, 163, 184, 0.06);
+  --sidebar-action-hover: rgba(124, 58, 237, 0.06);
   --sidebar-action-hover-text: #f1f5f9;
-  --sidebar-user-role: rgba(148, 163, 184, 0.6);
-  --sidebar-theme-bg: rgba(148, 163, 184, 0.06);
-  --sidebar-theme-border: rgba(148, 163, 184, 0.08);
+  --sidebar-user-role: rgba(148, 163, 184, 0.5);
+  --sidebar-theme-bg: rgba(124, 58, 237, 0.06);
+  --sidebar-theme-border: rgba(124, 58, 237, 0.1);
   --sidebar-theme-text: #94a3b8;
-  --sidebar-theme-hover-bg: rgba(52, 211, 153, 0.08);
-  --sidebar-theme-hover-text: #34d399;
-  --sidebar-logout-hover: rgba(248, 113, 113, 0.1);
+  --sidebar-theme-hover-bg: rgba(124, 58, 237, 0.12);
+  --sidebar-theme-hover-text: #a78bfa;
+  --sidebar-logout-hover: rgba(239, 68, 68, 0.1);
   --sidebar-logout-hover-text: #fca5a5;
-  --sidebar-overlay-bg: rgba(2, 6, 23, 0.65);
-  --sidebar-scrollbar: rgba(148, 163, 184, 0.2);
+  --sidebar-overlay-bg: rgba(2, 6, 23, 0.7);
+  --sidebar-scrollbar: rgba(148, 163, 184, 0.15);
   --sidebar-edge-fade: linear-gradient(90deg, transparent 90%, transparent 100%);
-  --sidebar-shadow: none;
+  --sidebar-shadow: 4px 0 30px rgba(0, 0, 0, 0.3);
 
   /* Role color tokens — dark mode */
   --role-cr-admin-bg: rgba(251, 146, 60, 0.12);   /* Orange visible on dark */
@@ -157,9 +157,9 @@
   --role-teacher-admin-fg: #a78bfa;                 /* Violet-400 */
 
   /* UI state tokens — dark mode */
-  --selection-ring: rgba(52, 211, 153, 0.25);
-  --dirty-row-bg: rgba(52, 211, 153, 0.06);
-  --dirty-cell-bg: rgba(52, 211, 153, 0.12);
+  --selection-ring: rgba(167, 139, 250, 0.25);
+  --dirty-row-bg: rgba(167, 139, 250, 0.06);
+  --dirty-cell-bg: rgba(167, 139, 250, 0.12);
   --info-bar-border: rgba(167, 139, 250, 0.2);
 }
 
@@ -197,7 +197,7 @@ input, select, textarea {
 }
 
 /* ═══════════════════════════════════════════════
-   Sidebar — theme-adaptive glassmorphism design
+   Sidebar — dark navy sidebar with purple accent
    ═══════════════════════════════════════════════ */
 .sidebar {
   width: 272px;
@@ -208,7 +208,9 @@ input, select, textarea {
       var(--sidebar-bg-end) 100%);
   color: var(--sidebar-text);
   position: fixed;
-  height: 100vh;
+  height: calc(100vh - 24px);
+  top: 12px;
+  left: 12px;
   overflow-y: auto;
   overflow-x: hidden;
   z-index: 100;
@@ -219,28 +221,30 @@ input, select, textarea {
     border-color 0.4s ease;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--sidebar-border);
+  border: 1px solid var(--sidebar-border);
+  border-radius: 16px;
   box-shadow: var(--sidebar-shadow);
   scrollbar-width: thin;
   scrollbar-color: var(--sidebar-scrollbar) transparent;
 }
 
-/* Subtle right-edge glow accent line for blending */
+/* Subtle right-edge glow accent line */
 .sidebar::after {
   content: '';
-  position: fixed;
-  top: 0;
+  position: absolute;
+  top: 20px;
   right: -1px;
-  width: 3px;
-  height: 100vh;
+  width: 2px;
+  height: calc(100% - 40px);
   background: linear-gradient(180deg,
     var(--sidebar-accent) 0%,
-    transparent 40%,
-    transparent 60%,
+    transparent 30%,
+    transparent 70%,
     var(--sidebar-accent) 100%);
-  opacity: 0.15;
+  opacity: 0.2;
   z-index: 101;
   pointer-events: none;
+  border-radius: 2px;
 }
 
 .sidebar::-webkit-scrollbar {
@@ -259,7 +263,7 @@ input, select, textarea {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 20px 20px 24px;
+  padding: 20px 20px 20px;
   border-bottom: 1px solid var(--sidebar-card-border);
 }
 
@@ -267,12 +271,12 @@ input, select, textarea {
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  background: #ffffff;
-  border: 1.5px solid var(--sidebar-accent);
+  background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #059669;
+  color: #ffffff;
   flex-shrink: 0;
   box-shadow: 0 4px 16px var(--sidebar-glow);
   transition: box-shadow 0.3s ease, transform 0.3s ease;
@@ -340,12 +344,12 @@ input, select, textarea {
   gap: 12px;
   padding: 10px 14px;
   color: var(--sidebar-text);
-  border-radius: 10px;
+  border-radius: 12px;
   font-weight: 500;
   font-size: 0.855rem;
   transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
-  margin: 1px 0;
+  margin: 2px 4px;
   text-decoration: none;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -448,11 +452,15 @@ input, select, textarea {
   50% { box-shadow: 0 2px 14px rgba(239, 68, 68, 0.65); }
 }
 
-/* ── Sidebar Footer — frosted glass card ── */
+/* ── Sidebar Footer — actions ── */
 .sidebar-footer {
   padding: 12px;
   border-top: 1px solid var(--sidebar-card-border);
   flex-shrink: 0;
+}
+
+.sidebar-footer-actions {
+  margin-top: auto;
 }
 
 .sidebar-user-card {
@@ -465,8 +473,15 @@ input, select, textarea {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--sidebar-card-border);
-  margin-bottom: 8px;
   transition: background 0.2s;
+}
+
+/* Top user profile (directly under the brand, like the Pinterest dashboard) */
+.sidebar-user-card-top {
+  margin: 14px 14px 4px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(124, 58, 237, 0.04));
+  border-color: rgba(124, 58, 237, 0.12);
 }
 
 .sidebar-user-card:hover {
@@ -474,17 +489,17 @@ input, select, textarea {
 }
 
 .sidebar-user-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--sidebar-link-active-bg);
-  border: 1.5px solid var(--sidebar-accent);
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 0.75rem;
-  color: var(--sidebar-accent);
+  font-size: 0.78rem;
+  color: #ffffff;
   flex-shrink: 0;
   letter-spacing: 0.5px;
   transition: box-shadow 0.3s;
@@ -591,7 +606,7 @@ input, select, textarea {
 /* Main Content */
 .main-content {
   flex: 1;
-  margin-left: 272px;
+  margin-left: 308px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -609,6 +624,7 @@ input, select, textarea {
   top: 0;
   z-index: 50;
   box-shadow: var(--shadow-sm);
+  border-radius: 0;
 }
 
 .topbar-brand h1 {
@@ -1133,7 +1149,7 @@ input, select, textarea {
 }
 
 /* ═════════════════════════════════════════════════════════════
-   Subject Cards — cohesive emerald/slate surface treatment
+   Subject Cards — cohesive violet/slate surface treatment
    ═════════════════════════════════════════════════════════════ */
 .subject-card {
   position: relative;
@@ -1516,7 +1532,7 @@ input, select, textarea {
 }
 
 .btn-success:hover {
-  background: #059669;
+  background: var(--success);
 }
 
 .btn-sm {
@@ -1575,7 +1591,7 @@ input, select, textarea {
   font-weight: 600;
   color: white;
   background: var(--gradient-primary);
-  box-shadow: 0 4px 14px -3px rgba(13, 148, 136, 0.5);
+  box-shadow: 0 4px 14px -3px rgba(124, 58, 237, 0.5);
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -1594,7 +1610,7 @@ input, select, textarea {
 
 .btn-add:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px -5px rgba(13, 148, 136, 0.55);
+  box-shadow: 0 8px 25px -5px rgba(124, 58, 237, 0.55);
 }
 
 .btn-add:hover::before {
@@ -1603,7 +1619,7 @@ input, select, textarea {
 
 .btn-add:active {
   transform: translateY(0);
-  box-shadow: 0 4px 10px -2px rgba(13, 148, 136, 0.4);
+  box-shadow: 0 4px 10px -2px rgba(124, 58, 237, 0.4);
 }
 
 .btn-add .add-icon {
@@ -1669,7 +1685,7 @@ input, select, textarea {
   background: var(--primary);
   color: white;
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px -5px rgba(13, 148, 136, 0.45);
+  box-shadow: 0 8px 25px -5px rgba(124, 58, 237, 0.45);
 }
 
 .btn-add-secondary:active {
@@ -1683,7 +1699,7 @@ input, select, textarea {
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  background: rgba(13, 148, 136, 0.12);
+  background: rgba(124, 58, 237, 0.12);
   font-size: 1rem;
   font-weight: 700;
   line-height: 1;
@@ -2123,14 +2139,14 @@ input, select, textarea {
   width: 76px;
   height: 76px;
   border-radius: 20px;
-  background: #ffffff;
-  border: 2px solid var(--primary);
-  color: #059669;
+  background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+  border: none;
+  color: #ffffff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 14px;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.25);
   overflow: hidden;
 }
 
@@ -2371,7 +2387,7 @@ input, select, textarea {
 /* Responsive */
 @media (max-width: 768px) {
   .sidebar {
-    transform: translateX(-100%);
+    transform: translateX(-110%);
     box-shadow: none;
   }
 
@@ -2490,19 +2506,18 @@ footer {
   accent-color: var(--primary);
 }
 
-/* Primary buttons: use a deep emerald surface with dark text for contrast
-   on bright emerald-400 accents in dark mode. */
+/* Primary buttons: use a deep violet surface with light contrasting text
+   on bright violet accents in dark mode. */
 .dark .btn-primary {
   background: var(--primary-dark);
-  color: #052e1b;
+  color: #f5f3ff;
 }
 .dark .btn-primary:hover {
   background: var(--primary);
-  color: #042f1a;
+  color: #1e1b4b;
 }
 
-/* Dark badge text: keep the variant-specific colors (success/danger/info/etc.) readable.
-   Do NOT force all .badge text to a single color. */
+/* Dark badge text: keep the variant-specific colors (success/danger/info/etc.) readable. */
 
 /* Todo toolbar dark-mode refinements */
 .dark .todo-filters {
@@ -2511,14 +2526,12 @@ footer {
 }
 .dark .todo-filter-btn { color: var(--gray); }
 .dark .todo-filter-btn:hover { color: var(--dark); background: rgba(255,255,255,0.05); }
-/* Active filter pill must keep readable text in dark mode. In dark the pill
-   background is the bright emerald accent, so force the label + count to a
-   high-contrast dark tone instead of letting the generic gray override win. */
+/* Active filter pill: use bright violet accent with high-contrast text */
 .dark .todo-filter-btn.active {
   background: var(--primary);
-  color: #042f1a;
+  color: #1e1b4b;
 }
-.dark .todo-filter-btn.active .todo-filter-label { color: #042f1a; }
+.dark .todo-filter-btn.active .todo-filter-label { color: #1e1b4b; }
 .dark .todo-filter-count {
   background: rgba(255,255,255,0.08);
   color: var(--gray);
@@ -2526,7 +2539,7 @@ footer {
 }
 .dark .todo-filter-btn.active .todo-filter-count {
   background: rgba(255,255,255,0.75);
-  color: #052e1b;
+  color: #1e1b4b;
   border-color: transparent;
 }
 .dark .todo-search-clear { background: var(--light-gray); color: var(--gray); }
@@ -2766,70 +2779,75 @@ footer {
 .dark .sidebar {
   background:
     linear-gradient(195deg,
-      rgba(15, 23, 42, 0.97) 0%,
-      rgba(15, 23, 42, 0.95) 40%,
-      rgba(15, 23, 42, 0.97) 100%);
-  border-right: 1px solid rgba(148, 163, 184, 0.04);
-  box-shadow: none;
+      rgba(9, 13, 24, 0.97) 0%,
+      rgba(12, 16, 32, 0.95) 40%,
+      rgba(9, 13, 24, 0.97) 100%);
+  border: 1px solid rgba(124, 58, 237, 0.08);
+  box-shadow: 4px 0 30px rgba(0, 0, 0, 0.3);
 }
 
 /* Reduce the right-edge accent glow — less edgy */
 .dark .sidebar::after {
-  opacity: 0.06;
+  opacity: 0.15;
   background: linear-gradient(180deg,
-    rgba(52, 211, 153, 0.4) 0%,
-    transparent 40%,
-    transparent 60%,
-    rgba(52, 211, 153, 0.4) 100%);
+    rgba(124, 58, 237, 0.5) 0%,
+    transparent 35%,
+    transparent 65%,
+    rgba(124, 58, 237, 0.5) 100%);
 }
 
 /* Make sidebar icons brighter and more visible in dark mode */
 .dark .sidebar-link .sidebar-link-icon {
   opacity: 1;
-  color: #cbd5e1;
+  color: #94a3b8;
 }
 
 .dark .sidebar-link:hover .sidebar-link-icon {
   opacity: 1;
-  color: #f1f5f9;
+  color: #e9d5ff;
   transform: scale(1.08);
 }
 
 .dark .sidebar-link.active .sidebar-link-icon {
   opacity: 1;
-  color: #34d399;
+  color: #a78bfa;
 }
 
 /* Softer active indicator in dark mode */
 .dark .sidebar-link.active {
-  background: rgba(52, 211, 153, 0.06);
-  color: #e2e8f0;
+  background: rgba(124, 58, 237, 0.12);
+  color: #e9d5ff;
 }
 
 .dark .sidebar-link.active::before {
-  background: linear-gradient(180deg, #34d399, #2dd4a8);
-  box-shadow: 0 0 6px rgba(52, 211, 153, 0.3);
+  background: linear-gradient(180deg, #7c3aed, #a78bfa);
+  box-shadow: 0 0 10px rgba(124, 58, 237, 0.4);
 }
 
 /* Subtle hover state in dark mode */
 .dark .sidebar-link:hover {
-  background: rgba(148, 163, 184, 0.08);
+  background: rgba(124, 58, 237, 0.08);
   color: #f1f5f9;
 }
 
 /* Brand icon glow softened in dark mode */
 .dark .sidebar-brand-icon {
-  box-shadow: 0 4px 12px rgba(52, 211, 153, 0.15);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
 }
 
 .dark .sidebar-brand:hover .sidebar-brand-icon {
-  box-shadow: 0 6px 16px rgba(52, 211, 153, 0.2);
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.3);
 }
 
 /* User profile card blending */
 .dark .sidebar-user-card {
-  background: rgba(148, 163, 184, 0.04);
-  border-top: 1px solid rgba(148, 163, 184, 0.06);
+  background: rgba(124, 58, 237, 0.05);
+  border: 1px solid rgba(124, 58, 237, 0.08);
+}
+
+.dark .sidebar-user-card-top {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(124, 58, 237, 0.06));
+  border-color: rgba(124, 58, 237, 0.15);
 }
 
 /* Action buttons blending */
@@ -2838,30 +2856,30 @@ footer {
 }
 
 .dark .sidebar-action-btn:hover {
-  background: rgba(148, 163, 184, 0.08);
+  background: rgba(124, 58, 237, 0.08);
   color: #f1f5f9;
 }
 
 .dark .sidebar-action-logout:hover {
-  background: rgba(248, 113, 113, 0.08);
+  background: rgba(239, 68, 68, 0.1);
   color: #fca5a5;
 }
 
 /* Theme toggle button blending */
 .dark .sidebar-theme-toggle {
-  background: rgba(148, 163, 184, 0.06);
-  border: 1px solid rgba(148, 163, 184, 0.08);
+  background: rgba(124, 58, 237, 0.06);
+  border: 1px solid rgba(124, 58, 237, 0.1);
   color: #94a3b8;
 }
 
 .dark .sidebar-theme-toggle:hover {
-  background: rgba(52, 211, 153, 0.08);
-  color: #34d399;
+  background: rgba(124, 58, 237, 0.12);
+  color: #a78bfa;
 }
 
 /* Section label softer in dark mode */
 .dark .sidebar-section-label {
-  color: rgba(148, 163, 184, 0.5);
+  color: rgba(148, 163, 184, 0.4);
 }
 
 /* Mobile sidebar shadow softened in dark mode */
@@ -2890,8 +2908,8 @@ footer {
 }
 
 .dark .topbar-right button[title]:hover {
-  background: rgba(52, 211, 153, 0.1) !important;
-  color: #34d399 !important;
+  background: rgba(124, 58, 237, 0.1) !important;
+  color: #a78bfa !important;
 }
 
 /* Admin badge — blend with topbar, avoid strong green tint */
@@ -3123,7 +3141,7 @@ footer {
 }
 .chat-tab:hover {
   color: var(--dark);
-  background: rgba(5, 150, 105, 0.04);
+  background: rgba(124, 58, 237, 0.04);
 }
 .chat-tab.active {
   color: var(--primary);
@@ -3520,8 +3538,8 @@ footer {
   overflow: hidden;
 }
 .id-card-approved {
-  border-color: #a7f3d0;
-  box-shadow: 0 6px 16px -6px rgba(5, 150, 105, 0.35);
+  border-color: #c4b5fd;
+  box-shadow: 0 6px 16px -6px rgba(124, 58, 237, 0.35);
 }
 .id-card-pending { border-color: #fde68a; }
 .id-card-rejected { border-color: #fecaca; }
@@ -3585,8 +3603,8 @@ footer {
   color: #78350f;
 }
 .id-card-status-approved {
-  background: #34d399;
-  color: #064e3b;
+  background: var(--primary);
+  color: #1e1b4b;
 }
 .id-card-status-rejected {
   background: #f87171;

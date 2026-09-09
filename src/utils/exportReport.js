@@ -95,7 +95,7 @@ export function exportImage(filename, { title, subtitle, footer, headers, rows }
   const headerTop = y;
 
   // Header row
-  g.fillStyle = '#059669';
+  g.fillStyle = '#7c3aed';
   g.fillRect(leftX, y, tableW, HEADER_H);
   g.font = '700 13px Arial, Helvetica, sans-serif';
   g.fillStyle = '#ffffff';
