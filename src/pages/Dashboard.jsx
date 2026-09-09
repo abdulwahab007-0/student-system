@@ -82,6 +82,12 @@ function Dashboard() {
     .sort((a, b) => b.average - a.average)
     .slice(0, 3);
 
+  // Student ranking: top 8 students by average marks for the bar chart
+  const rankedStudents = [...studentScores]
+    .filter(s => s.average > 0)
+    .sort((a, b) => b.average - a.average)
+    .slice(0, 8);
+
   // Gender ratio for admin chart
   const maleCount = visibleStudents.filter(s => (s.gender || '').toLowerCase() === 'male').length;
   const femaleCount = visibleStudents.filter(s => (s.gender || '').toLowerCase() === 'female').length;
@@ -270,11 +276,18 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* Gender Distribution Chart */}
+          {/* Charts Row: Gender Distribution + Student Ranking */}
           {totalStudents > 0 && (
-            <div className="panel" style={{ marginBottom: '24px' }}>
-              <div className="panel-header">
-                <h3>📊 Gender Distribution</h3>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+              gap: '20px',
+              marginBottom: '24px',
+            }}>
+              {/* Gender Distribution Chart */}
+              <div className="panel">
+                <div className="panel-header">
+                  <h3>📊 Gender Distribution</h3>
                 <span style={{ fontSize: '0.8rem', color: 'var(--gray)' }}>
                   {totalStudents} total students
                 </span>
@@ -339,6 +352,63 @@ function Dashboard() {
                   {totalWithGender === 0 && (
                     <div style={{ fontSize: '0.8rem', color: 'var(--gray)', fontStyle: 'italic' }}>
                       No gender data available
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+              {/* Student Ranking Chart */}
+              <div className="panel">
+                <div className="panel-header">
+                  <h3>🏆 Student Ranking</h3>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--gray)' }}>
+                    {rankedStudents.length} student{rankedStudents.length !== 1 ? 's' : ''} with marks
+                  </span>
+                </div>
+                <div className="panel-body" style={{ padding: '16px 24px' }}>
+                  {rankedStudents.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {rankedStudents.map((student, i) => {
+                        const barColors = ['#f59e0b', '#94a3b8', '#d97706', '#6366f1', '#06b6d4', '#10b981', '#8b5cf6', '#ec4899'];
+                        const color = barColors[i % barColors.length];
+                        const medalLabels = ['🥇', '🥈', '🥉'];
+                        return (
+                          <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '0.82rem', color: 'var(--gray)', width: '28px', textAlign: 'right', flexShrink: 0 }}>
+                              {i < 3 ? medalLabels[i] : `#${i + 1}`}
+                            </span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--dark)', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {student.name}
+                                <span style={{ fontWeight: '400', color: 'var(--gray)', fontSize: '0.72rem', marginLeft: '6px' }}>
+                                  {student.className}
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ flex: 1, height: '10px', background: 'var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+                                  <div style={{
+                                    height: '100%',
+                                    width: `${student.average}%`,
+                                    background: color,
+                                    borderRadius: '6px',
+                                    transition: 'width 0.4s ease',
+                                  }} />
+                                </div>
+                                <span style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--dark)', minWidth: '40px', textAlign: 'right' }}>
+                                  {student.average}%
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="empty-state" style={{ padding: '20px' }}>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--gray)' }}>
+                        No marks recorded yet — student rankings will appear here.
+                      </div>
                     </div>
                   )}
                 </div>
