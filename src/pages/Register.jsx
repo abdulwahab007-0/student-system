@@ -2,11 +2,33 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import { useTheme } from '../context/ThemeContext';
 import { getAllClassSuggestions } from '../utils/classUtils';
 import ClassInput from '../components/ClassInput';
 
+const MoonIcon = () => (
+  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+  </svg>
+);
+
+const SunIcon = () => (
+  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="5" />
+    <line x1="12" y1="1" x2="12" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="23" />
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+    <line x1="1" y1="12" x2="3" y2="12" />
+    <line x1="21" y1="12" x2="23" y2="12" />
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+  </svg>
+);
+
 function Register() {
   const { register } = useAuth();
+  const { darkMode, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const { students, teachers, subjects, classes } = useData();
   const classSuggestions = getAllClassSuggestions(classes, students, teachers, subjects);
@@ -79,13 +101,36 @@ function Register() {
 
   return (
     <div className="auth-container">
+      {/* Decorative abstract background (matches Login) */}
+      <div className="auth-orb auth-orb-1" />
+      <div className="auth-orb auth-orb-2" />
+      <div className="auth-orb auth-orb-3" />
+      <div className="auth-orb auth-orb-4" />
+      <div className="auth-ring auth-ring-1" />
+      <div className="auth-ring auth-ring-2" />
+      <div className="auth-ring auth-ring-3" />
+
+      <button
+        className="auth-theme-toggle"
+        onClick={toggleTheme}
+        title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+        aria-label="Toggle theme"
+      >
+        {darkMode ? <SunIcon /> : <MoonIcon />}
+      </button>
+
       <div className="auth-card">
         <div className="auth-logo">
           <div className="auth-logo-icon">
-            <img src="/ncba-logo.webp" alt="NCBA&F Logo" style={{ width: '48px', height: '48px', objectFit: 'contain' }} />
+            <img src="/ncba-logo.webp" alt="NCBA&F Logo" />
           </div>
           <h1>NCBA <span>&amp;</span> E</h1>
-          <p>Register for Student Management System</p>
+          <p>Student Management System</p>
+        </div>
+
+        <div className="auth-heading">
+          <h2>Create your account</h2>
+          <p>Fill in your details to get started</p>
         </div>
 
         {error && (
