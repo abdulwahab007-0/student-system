@@ -82,6 +82,13 @@ function Dashboard() {
     .sort((a, b) => b.average - a.average)
     .slice(0, 3);
 
+  // Gender ratio for admin chart
+  const maleCount = visibleStudents.filter(s => (s.gender || '').toLowerCase() === 'male').length;
+  const femaleCount = visibleStudents.filter(s => (s.gender || '').toLowerCase() === 'female').length;
+  const totalWithGender = maleCount + femaleCount;
+  const malePct = totalWithGender > 0 ? Math.round((maleCount / totalWithGender) * 100) : 0;
+  const femalePct = totalWithGender > 0 ? 100 - malePct : 0;
+
   const rankMedals = ['gold', 'silver', 'bronze'];
   const rankLabels = ['1st', '2nd', '3rd'];
 
@@ -262,6 +269,82 @@ function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* Gender Distribution Chart */}
+          {totalStudents > 0 && (
+            <div className="panel" style={{ marginBottom: '24px' }}>
+              <div className="panel-header">
+                <h3>📊 Gender Distribution</h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--gray)' }}>
+                  {totalStudents} total students
+                </span>
+              </div>
+              <div className="panel-body" style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '40px',
+                padding: '28px 24px',
+                flexWrap: 'wrap',
+              }}>
+                <svg width="150" height="150" viewBox="0 0 150 150">
+                  {(() => {
+                    const R = 56;
+                    const C = 2 * Math.PI * R;
+                    const maleArc = (malePct / 100) * C;
+                    const femaleArc = (femalePct / 100) * C;
+                    return (
+                      <>
+                        <circle cx="75" cy="75" r={R} fill="none" stroke="var(--border)" strokeWidth="16" />
+                        {malePct > 0 && (
+                          <circle cx="75" cy="75" r={R} fill="none"
+                            stroke="#6366f1" strokeWidth="16"
+                            strokeDasharray={`${maleArc} ${C}`}
+                            strokeLinecap="round"
+                            transform="rotate(-90 75 75)" />
+                        )}
+                        {femalePct > 0 && (
+                          <circle cx="75" cy="75" r={R} fill="none"
+                            stroke="#ec4899" strokeWidth="16"
+                            strokeDasharray={`${femaleArc} ${C}`}
+                            strokeDashoffset={`${-maleArc}`}
+                            strokeLinecap="round"
+                            transform="rotate(-90 75 75)" />
+                        )}
+                        <text x="75" y="71" textAnchor="middle" fontSize="24" fontWeight="700" fill="var(--dark)">{totalWithGender}</text>
+                        <text x="75" y="88" textAnchor="middle" fontSize="10" fill="var(--gray)">students</text>
+                      </>
+                    );
+                  })()}
+                </svg>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '14px', height: '14px', borderRadius: '4px', background: '#6366f1', flexShrink: 0 }} />
+                    <div>
+                      <span style={{ fontSize: '0.92rem', fontWeight: '600', color: 'var(--dark)' }}>Male</span>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--gray)', marginLeft: '8px' }}>
+                        {maleCount} students · {malePct}%
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '14px', height: '14px', borderRadius: '4px', background: '#ec4899', flexShrink: 0 }} />
+                    <div>
+                      <span style={{ fontSize: '0.92rem', fontWeight: '600', color: 'var(--dark)' }}>Female</span>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--gray)', marginLeft: '8px' }}>
+                        {femaleCount} students · {femalePct}%
+                      </span>
+                    </div>
+                  </div>
+                  {totalWithGender === 0 && (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--gray)', fontStyle: 'italic' }}>
+                      No gender data available
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Top 3 Students */}
           <div className="page-header" style={{ marginBottom: '15px' }}>

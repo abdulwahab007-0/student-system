@@ -1030,18 +1030,15 @@ input, select, textarea {
 }
 
 .top-student-card.gold {
-  border: 2px solid var(--warning);
-  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border-top: 3px solid #f59e0b;
 }
 
 .top-student-card.silver {
-  border: 1px solid #cbd5e1;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-top: 3px solid #94a3b8;
 }
 
 .top-student-card.bronze {
-  border: 1px solid #d97706;
-  background: linear-gradient(135deg, #fffbeb 0%, #fed7aa 100%);
+  border-top: 3px solid #d97706;
 }
 
 .rank-badge {
