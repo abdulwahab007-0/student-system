@@ -17,7 +17,9 @@ function MyCard() {
 
   const load = async () => {
     try {
-      setLoading(true);
+      const cached = api.getSwrCache('/cards/my');
+      if (cached) { setData(cached); setLoading(false); }
+      else setLoading(true);
       setData(await api.getMyCard());
     } catch (err) {
       showToast(err.message, 'error');

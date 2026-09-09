@@ -4,14 +4,24 @@ import { requirePermission } from '../middleware/auth.js';
 const router = Router();
 
 router.get('/', requirePermission('view_classes'), async (req, res) => {
-  const classes = await db.all('SELECT * FROM classes ORDER BY id');
-  // Compute studentCount and subjectCount for each class
-  const enriched = [];
-  for (const c of classes) {
-    const sc = await db.get('SELECT COUNT(*) as c FROM students WHERE className = ?', [c.name]);
-    const sbc = await db.get('SELECT COUNT(*) as c FROM subjects WHERE className = ?', [c.name]);
-    enriched.push({ ...c, studentCount: sc.c, subjectCount: sbc.c });
-  }
+  // Single query — correlated subqueries compute the per-class counts that the
+  // old loop needed 2 extra round trips per class for (an N+1 that is very
+  // costly on the Supabase backend). Works identically on SQLite and Postgres.
+  const classes = await db.all(`
+    SELECT c.*,
+      (SELECT COUNT(*) FROM students s WHERE s.className = c.name) AS studentCount,
+      (SELECT COUNT(*) FROM subjects sub WHERE sub.className = c.name) AS subjectCount
+    FROM classes c
+    ORDER BY c.id
+  `);
+  // Postgres folds unquoted aliases to lowercase (studentcount) while SQLite
+  // keeps the camelCase spelling — normalise so both backends return the exact
+  // shape the frontend expects.
+  const enriched = classes.map(c => ({
+    ...c,
+    studentCount: Number(c.studentcount ?? c.studentCount ?? 0),
+    subjectCount: Number(c.subjectcount ?? c.subjectCount ?? 0),
+  }));
   res.json(enriched);
 });
 

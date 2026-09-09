@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import db from '../db.js';
+import { clearPermissionCache } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -26,12 +27,14 @@ router.put('/', async (req, res) => {
     }
   });
   await insertAll();
+  clearPermissionCache(); // saved overrides take effect immediately
   res.json({ success: true });
 });
 
 // POST /api/permissions/reset - clear all overrides
 router.post('/reset', async (req, res) => {
   await db.exec('DELETE FROM role_permissions');
+  clearPermissionCache();
   res.json({ success: true });
 });
 
@@ -60,12 +63,14 @@ router.put('/users', async (req, res) => {
     }
   });
   await insertAll();
+  clearPermissionCache(); // saved overrides take effect immediately
   res.json({ success: true });
 });
 
 // POST /api/permissions/users/reset - clear all user overrides
 router.post('/users/reset', async (req, res) => {
   await db.exec('DELETE FROM user_permissions');
+  clearPermissionCache();
   res.json({ success: true });
 });
 

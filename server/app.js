@@ -8,12 +8,14 @@
 
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import db, { initDatabase, seedDatabase } from './db.js';
-import { authMiddleware, requirePermission } from './middleware/auth.js';
+import { authMiddleware, requirePermission, clearPermissionCache } from './middleware/auth.js';
 import { UPLOAD_DIR, ensureUploadDir } from './uploadUtils.js';
 import authRoutes from './routes/auth.js';
+import bootstrapRoutes from './routes/bootstrap.js';
 import adminRoutes from './routes/admin.js';
 import permissionsRoutes from './routes/permissions.js';
 import studentsRoutes from './routes/students.js';
@@ -37,6 +39,9 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+// gzip/brotli-compress API responses (large admin payloads shrink ~70% —
+// less transfer time on slow connections, no client change required).
+app.use(compression());
 
 // Serve uploaded card photos. UPLOAD_DIR is <project>/uploads/cards locally and
 // /tmp/uploads/cards on Vercel — the parent dir is what we export statically.
@@ -47,32 +52,51 @@ if (useSupabase) {
   app.use('/api/uploads', express.static(path.join(UPLOAD_DIR, '..')));
 }
 
-// ── Initialise database (idempotent — safe to call on every cold start) ──
-// IMPORTANT: Vercel runs this at *module scope* on every cold start. If the
-// Supabase pooler momentarily refuses a connection here (transient hiccup), an
-// UNHANDLED top-level await rejection crashes the whole serverless function
-// before Express's error handler exists — the platform then returns a bare 500
-// ("FUNCTION_INVOCATION_FAILED" / "A server error has occurred") with no JSON
-// error body. Both initDatabase() and seedDatabase() are internally guarded
-// (idempotent schema, seed only when empty), so it's safe to swallow and retry
-// here: a later warm request will then succeed normally.
-try {
-  await initDatabase();
-} catch (err) {
-  console.error('[init] initDatabase failed (will retry on next invocation):', err.message);
-}
-try {
-  await seedDatabase();
-} catch (err) {
-  console.error('[init] seedDatabase failed (will retry on next invocation):', err.message);
+// ── Database initialisation (lazy, once per instance) ──
+// initDatabase()/seedDatabase() are idempotent, but they do real work (schema
+// checks + a users-count round trip) and are SKIPPED entirely on warm
+// instances. Instead of blocking the whole module import on every cold start,
+// we run them lazily on the first request. Failures (e.g. a transient
+// Supabase pooler hiccup) are swallowed and retried on the next request —
+// same resilience as before, without the risk of an unhandled top-level-await
+// rejecting the whole import.
+let dbReadyPromise = null;
+function ensureDbReady() {
+  if (!dbReadyPromise) {
+    dbReadyPromise = (async () => {
+      try {
+        await initDatabase();
+      } catch (err) {
+        console.error('[init] initDatabase failed (will retry on next invocation):', err.message);
+      }
+      try {
+        await seedDatabase();
+      } catch (err) {
+        console.error('[init] seedDatabase failed (will retry on next invocation):', err.message);
+      }
+    })();
+  }
+  return dbReadyPromise;
 }
 
 // ── Routes ──────────────────────────────────────────────────────────────
+// Init the DB before handling API routes (see ensureDbReady above).
+app.use(async (req, res, next) => {
+  try {
+    await ensureDbReady();
+  } catch (err) {
+    console.error('[init] first-request init failed:', err.message);
+  }
+  next();
+});
+
 app.use('/api/auth', authRoutes);
+app.use('/api/bootstrap', authMiddleware, bootstrapRoutes);
 
 // Data reset (auth + super-admin)
 app.post('/api/data/reset', authMiddleware, requirePermission('assign_cr'), async (req, res) => {
   await db.exec('DELETE FROM role_permissions; DELETE FROM marks; DELETE FROM students; DELETE FROM teachers; DELETE FROM subjects; DELETE FROM classes; DELETE FROM class_schedules; DELETE FROM chat_messages; DELETE FROM student_cards; DELETE FROM teacher_cards;');
+  clearPermissionCache(); // role overrides were wiped — drop the memoised lookups
   res.json({ success: true, message: 'Data reset; restart server to reseed defaults.' });
 });
 

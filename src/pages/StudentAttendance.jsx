@@ -95,6 +95,14 @@ function StudentAttendance() {
       return;
     }
     setLoading(true);
+    // Paint the previously loaded records instantly, then refresh in the background
+    const cacheKey = `/attendance/student-records?studentId=${selectedId}`;
+    const cached = api.getSwrCache(cacheKey);
+    if (cached && Array.isArray(cached.records)) {
+      setRecords(cached.records);
+      setStudent(cached.student || null);
+      setLoading(false);
+    }
     api.getStudentAttendanceRecords(selectedId, fromDate, toDate)
       .then(data => {
         setRecords(data.records || []);

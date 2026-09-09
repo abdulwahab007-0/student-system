@@ -9,6 +9,7 @@ function setToken(token) {
 }
 
 function clearToken() {
+  clearSwrForToken(getToken());
   localStorage.removeItem('sms_token');
 }
 
@@ -37,6 +38,105 @@ async function request(method, path, body) {
 
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
+}
+
+// Single-flight bootstrap: AuthContext and DataContext both need (different
+// slices of) the same post-login payload, so collapse them into ONE HTTP
+// request. Keyed by token so a different user logging in never inherits the
+// previous user's memoised response.
+let bootstrapInFlight = null;
+
+// ── Cached GET helper (single-flight + TTL) ──────────────────────────────
+// Large list endpoints (cards, attendance) are re-fetched every time a user
+// navigates to their page. Cache the result in memory for a short TTL and
+// collapse concurrent callers into one request, so navigating away and back —
+// or two components fetching the same list — hits the server once instead of
+// repeatedly. Keyed by token + path so different users never share data.
+const SWR_CACHE_PREFIX = 'sms_swr_';
+const swrCache = new Map();   // path → { t, data }
+const swrInFlight = {};       // path → Promise
+
+function swrCacheKey(path) {
+  return `${getToken() || 'anon'}|${path}`;
+}
+
+function readSwrLocal(path) {
+  try {
+    const raw = localStorage.getItem(SWR_CACHE_PREFIX + swrCacheKey(path));
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function writeSwrLocal(path, data) {
+  try {
+    localStorage.setItem(SWR_CACHE_PREFIX + swrCacheKey(path), JSON.stringify(data));
+  } catch { /* private mode — best effort */ }
+}
+
+function clearSwrForToken(token) {
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(SWR_CACHE_PREFIX)) keys.push(k);
+    }
+    const prefix = SWR_CACHE_PREFIX + `${token || 'anon'}|`;
+    for (const k of keys) {
+      if (k.startsWith(prefix)) localStorage.removeItem(k);
+    }
+  } catch { /* ignore */ }
+  swrCache.clear();
+}
+
+// cachedGet(path, opts):
+//   • Fresh in-memory entry (< ttl)   → return it with no network
+//   • Another caller already fetching → share that promise (single-flight)
+//   • Otherwise → fetch once, cache in memory + localStorage for the next
+//     navigation/visit within the TTL window.
+async function cachedGet(path, { ttl = 60000 } = {}) {
+  const key = swrCacheKey(path);
+  const now = Date.now();
+
+  const mem = swrCache.get(key);
+  if (mem && now - mem.t < ttl) return mem.data;
+
+  if (swrInFlight[path]) return swrInFlight[path];
+
+  const req = request('GET', path)
+    .then(data => {
+      swrCache.set(key, { t: Date.now(), data });
+      writeSwrLocal(path, data);
+      return data;
+    })
+    .finally(() => { delete swrInFlight[path]; });
+
+  swrInFlight[path] = req;
+  return req;
+}
+
+// Drop the cached copies after a mutation so the next read revalidates.
+// Matches by exact path AND by prefix, so query-string variants
+// (e.g. /attendance/student-records?studentId=X&from=…) are also cleared.
+function invalidateSwr(...pathPatterns) {
+  for (const p of pathPatterns) {
+    if (swrCache.has(p)) swrCache.delete(p);
+    // Prefix sweep: any cachedGet entry whose token-keyed path starts with p
+    for (const [k] of swrCache) {
+      const sep = k.indexOf('|');
+      const pathPart = sep >= 0 ? k.slice(sep + 1) : k;
+      if (pathPart.startsWith(p)) swrCache.delete(k);
+    }
+    delete swrInFlight[p];
+    try {
+      const localPrefix = SWR_CACHE_PREFIX + swrCacheKey(p);
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(localPrefix)) keys.push(k);
+      }
+      for (const k of keys) localStorage.removeItem(k);
+    } catch { /* ignore */ }
+  }
 }
 
 const api = {
@@ -108,43 +208,77 @@ const api = {
 
   // Class Schedules
   getSchedules: () => request('GET', '/schedules'),
-  getClassSchedule: (className) => request('GET', `/schedules/${encodeURIComponent(className)}`),
-  saveClassSchedule: (className, data) => request('PUT', `/schedules/${encodeURIComponent(className)}`, data),
-  deleteClassSchedule: (className) => request('DELETE', `/schedules/${encodeURIComponent(className)}`),
+  getClassSchedule: (className) => cachedGet(`/schedules/${encodeURIComponent(className)}`, { ttl: 120000 }),
+  saveClassSchedule: (className, data) => {
+    invalidateSwr(`/schedules/${encodeURIComponent(className)}`);
+    return request('PUT', `/schedules/${encodeURIComponent(className)}`, data);
+  },
+  deleteClassSchedule: (className) => {
+    invalidateSwr(`/schedules/${encodeURIComponent(className)}`);
+    return request('DELETE', `/schedules/${encodeURIComponent(className)}`);
+  },
 
   // Attendance
   getGeofences: () => request('GET', '/attendance/geofences'),
-  getGeofencesForClass: (className) => request('GET', `/attendance/geofences/${encodeURIComponent(className)}`),
-  createGeofence: (data) => request('POST', '/attendance/geofences', data),
-  updateGeofence: (id, data) => request('PUT', `/attendance/geofences/${id}`, data),
-  deleteGeofence: (id) => request('DELETE', `/attendance/geofences/${id}`),
-  markAttendance: (data) => request('POST', '/attendance/mark', data),
+  getGeofencesForClass: (className) => cachedGet(`/attendance/geofences/${encodeURIComponent(className)}`, { ttl: 120000 }),
+  createGeofence: (data) => {
+    invalidateSwr('/attendance/geofences');
+    return request('POST', '/attendance/geofences', data);
+  },
+  updateGeofence: (id, data) => {
+    invalidateSwr('/attendance/geofences');
+    return request('PUT', `/attendance/geofences/${id}`, data);
+  },
+  deleteGeofence: (id) => {
+    invalidateSwr('/attendance/geofences');
+    return request('DELETE', `/attendance/geofences/${id}`);
+  },
+  markAttendance: (data) => {
+    // Clear cached attendance for the affected student so history refreshes
+    const sId = data?.studentId;
+    invalidateSwr('/attendance/my', `/attendance/student/${sId}`);
+    return request('POST', '/attendance/mark', data);
+  },
   getAttendanceRecords: (params) => {
     const qs = new URLSearchParams(params).toString();
-    return request('GET', `/attendance/records${qs ? '?' + qs : ''}`);
+    return cachedGet(`/attendance/records${qs ? '?' + qs : ''}`, { ttl: 30000 });
   },
-  getStudentAttendance: (studentId) => request('GET', `/attendance/student/${studentId}`),
+  getStudentAttendance: (studentId) => cachedGet(`/attendance/student/${studentId}`, { ttl: 30000 }),
   getStudentAttendanceRecords: (studentId, from, to) => {
     const qs = new URLSearchParams({ studentId });
     if (from) qs.set('from', from);
     if (to) qs.set('to', to);
-    return request('GET', `/attendance/student-records?${qs.toString()}`);
+    return cachedGet(`/attendance/student-records?${qs.toString()}`, { ttl: 30000 });
   },
   getAttendanceSummary: (className, date) => {
     const qs = date ? `?date=${date}` : '';
     return request('GET', `/attendance/summary/${encodeURIComponent(className)}${qs}`);
   },
-  approveAttendance: (id, action) => request('PUT', `/attendance/approve/${id}`, { action }),
-  bulkAttendanceAction: (ids, action) => request('PUT', '/attendance/bulk-action', { ids, action }),
-  updateAttendancePresence: (id, presence) => request('PUT', `/attendance/${id}/presence`, { presence }),
-  deleteAttendanceRecord: (id) => request('DELETE', `/attendance/${id}`),
+  approveAttendance: (id, action) => {
+    invalidateSwr('/attendance/records', '/attendance/my', '/attendance/report');
+    return request('PUT', `/attendance/approve/${id}`, { action });
+  },
+  bulkAttendanceAction: (ids, action) => {
+    invalidateSwr('/attendance/records', '/attendance/my', '/attendance/report');
+    return request('PUT', '/attendance/bulk-action', { ids, action });
+  },
+  updateAttendancePresence: (id, presence) => {
+    invalidateSwr('/attendance/records', '/attendance/my');
+    return request('PUT', `/attendance/${id}/presence`, { presence });
+  },
+  deleteAttendanceRecord: (id) => {
+    invalidateSwr('/attendance/records', '/attendance/my', '/attendance/report');
+    return request('DELETE', `/attendance/${id}`);
+  },
   getAttendanceReport: (params) => {
     const qs = new URLSearchParams(params).toString();
-    return request('GET', `/attendance/report${qs ? '?' + qs : ''}`);
+    return cachedGet(`/attendance/report${qs ? '?' + qs : ''}`, { ttl: 30000 });
   },
-  reportAttendanceAction: (studentId, from, to, action) =>
-    request('PUT', '/attendance/report-action', { studentId, from, to, action }),
-  getMyAttendance: () => request('GET', '/attendance/my'),
+  reportAttendanceAction: (studentId, from, to, action) => {
+    invalidateSwr('/attendance/report', `/attendance/student/${studentId}`, `/attendance/student-records`);
+    return request('PUT', '/attendance/report-action', { studentId, from, to, action });
+  },
+  getMyAttendance: () => cachedGet('/attendance/my', { ttl: 30000 }),
 
   // Chat
   getChatMessages: (channel, limit = 100, before) => {
@@ -156,8 +290,8 @@ const api = {
   deleteChatMessage: (id) => request('DELETE', `/chat/messages/${id}`),
 
   // Student Cards
-  getStudentCards: () => request('GET', '/cards'),
-  getMyCard: () => request('GET', '/cards/my'),
+  getStudentCards: () => cachedGet('/cards'),
+  getMyCard: () => cachedGet('/cards/my', { ttl: 30000 }),
   uploadCardPhoto: (studentId, file) => {
     // Raw-bytes upload (JPG/PNG/WebP) — the server validates the actual image content
     const headers = { Authorization: `Bearer ${getToken()}`, 'Content-Type': file.type || 'image/jpeg' };
@@ -167,15 +301,22 @@ const api = {
         let data;
         try { data = text ? JSON.parse(text) : {}; } catch { data = {}; }
         if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
+        invalidateSwr('/cards', '/cards/my');
         return data;
       });
   },
-  approveCardPhoto: (id) => request('PUT', `/cards/${id}/approve`),
-  rejectCardPhoto: (id, note) => request('PUT', `/cards/${id}/reject`, { note }),
+  approveCardPhoto: (id) => {
+    invalidateSwr('/cards', '/cards/my');
+    return request('PUT', `/cards/${id}/approve`);
+  },
+  rejectCardPhoto: (id, note) => {
+    invalidateSwr('/cards', '/cards/my');
+    return request('PUT', `/cards/${id}/reject`, { note });
+  },
 
   // Teacher Cards
-  getTeacherCards: () => request('GET', '/teacher-cards'),
-  getMyTeacherCard: () => request('GET', '/teacher-cards/my'),
+  getTeacherCards: () => cachedGet('/teacher-cards'),
+  getMyTeacherCard: () => cachedGet('/teacher-cards/my', { ttl: 30000 }),
   uploadTeacherCardPhoto: (name, file) => {
     // Raw-bytes upload (JPG/PNG/WebP) — the server validates the actual image content
     const headers = { Authorization: `Bearer ${getToken()}`, 'Content-Type': file.type || 'image/jpeg' };
@@ -185,11 +326,50 @@ const api = {
         let data;
         try { data = text ? JSON.parse(text) : {}; } catch { data = {}; }
         if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
+        invalidateSwr('/teacher-cards', '/teacher-cards/my');
         return data;
       });
   },
-  approveTeacherCardPhoto: (id) => request('PUT', `/teacher-cards/${id}/approve`),
-  rejectTeacherCardPhoto: (id, note) => request('PUT', `/teacher-cards/${id}/reject`, { note }),
+  approveTeacherCardPhoto: (id) => {
+    invalidateSwr('/teacher-cards', '/teacher-cards/my');
+    return request('PUT', `/teacher-cards/${id}/approve`);
+  },
+  rejectTeacherCardPhoto: (id, note) => {
+    invalidateSwr('/teacher-cards', '/teacher-cards/my');
+    return request('PUT', `/teacher-cards/${id}/reject`, { note });
+  },
+
+  // Bootstrap — one request replaces the old 9-call login data storm
+  getBootstrap: () => {
+    const token = getToken();
+    if (bootstrapInFlight && bootstrapInFlight.token === token) {
+      return bootstrapInFlight.promise;
+    }
+    const promise = request('GET', '/bootstrap').finally(() => {
+      if (bootstrapInFlight && bootstrapInFlight.promise === promise) bootstrapInFlight = null;
+    });
+    bootstrapInFlight = { token, promise };
+    return promise;
+  },
+
+  // Read a cached copy (memory → localStorage) so pages can paint instantly
+  // before the background revalidation replaces it with fresh data. Matches
+  // exact key first, then any cached entry whose path starts with `path`
+  // (covers query-string variants like /attendance/records?className=…).
+  getSwrCache: (path) => {
+    const key = swrCacheKey(path);
+    if (swrCache.has(key)) return swrCache.get(key).data;
+    // Prefix sweep on the in-memory map
+    for (const [k, entry] of swrCache) {
+      const sep = k.indexOf('|');
+      const pathPart = sep >= 0 ? k.slice(sep + 1) : k;
+      if (pathPart.startsWith(path)) return entry.data;
+    }
+    return readSwrLocal(path);
+  },
+
+  // Expose for DataContext to invalidate card caches after student/teacher CRUD
+  invalidateSwr,
 
   // Token management
   setToken,

@@ -81,6 +81,9 @@ function MarkAttendance() {
   const loadMyRecords = async () => {
     if (!student) return;
     try {
+      // Paint the previous records instantly, then revalidate in the background
+      const cached = api.getSwrCache(`/attendance/student/${student.id}`);
+      if (cached && Array.isArray(cached)) setMyRecords(cached);
       const recs = await api.getStudentAttendance(student.id);
       setMyRecords(recs);
     } catch {}

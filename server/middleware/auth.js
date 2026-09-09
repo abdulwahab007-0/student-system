@@ -60,18 +60,48 @@ const DEFAULT_RIGHTS = {
   upload_own_teacher_card_photo: ['teacher_admin'],
 };
 
-async function roleHasRight(role, rightKey) {
-  const defaults = DEFAULT_RIGHTS[rightKey] || [];
-  const row = await db.get('SELECT granted FROM role_permissions WHERE role = ? AND rightKey = ?', [role, rightKey]);
-  if (row) return !!row.granted;
-  return defaults.includes(role);
+// ── Permission lookup cache ────────────────────────────────────────────────
+// Permission checks run on EVERY request (requirePermission + the route-level
+// upload guards). On SQLite they're microseconds; on Supabase each lookup is a
+// separate network round trip to the pooler — 2 trips per guarded request.
+// Overrides change rarely, so the resolved boolean is memoized per
+// (user|role, rightKey) in-process for a short TTL. The permission save/reset
+// endpoints call clearPermissionCache(), so admin edits take effect instantly;
+// the TTL only bounds cross-instance staleness.
+const PERM_CACHE_TTL_MS = 60_000;
+const permCache = new Map();
+
+function cachedPerm(key, fn) {
+  const now = Date.now();
+  const hit = permCache.get(key);
+  if (hit && hit.expires > now) return Promise.resolve(hit.value);
+  return Promise.resolve(fn()).then(value => {
+    permCache.set(key, { value, expires: now + PERM_CACHE_TTL_MS });
+    return value;
+  });
 }
 
-export async function userHasRight(userId, role, rightKey) {
-  // Check user-level override first, then fall back to role-level
-  const userRow = await db.get('SELECT granted FROM user_permissions WHERE userId = ? AND rightKey = ?', [userId, rightKey]);
-  if (userRow) return !!userRow.granted;
-  return roleHasRight(role, rightKey);
+export function clearPermissionCache() {
+  permCache.clear();
+}
+
+function roleHasRight(role, rightKey) {
+  const defaults = DEFAULT_RIGHTS[rightKey] || [];
+  return cachedPerm(`role:${role}:${rightKey}`, async () => {
+    const row = await db.get('SELECT granted FROM role_permissions WHERE role = ? AND rightKey = ?', [role, rightKey]);
+    if (row) return !!row.granted;
+    return defaults.includes(role);
+  });
+}
+
+export function userHasRight(userId, role, rightKey) {
+  // Check user-level override first, then fall back to role-level — the exact
+  // original logic (explicit override rows included), just memoized.
+  return cachedPerm(`user:${userId}:${rightKey}`, async () => {
+    const userRow = await db.get('SELECT granted FROM user_permissions WHERE userId = ? AND rightKey = ?', [userId, rightKey]);
+    if (userRow) return !!userRow.granted;
+    return roleHasRight(role, rightKey);
+  });
 }
 
 export function requirePermission(rightKey) {

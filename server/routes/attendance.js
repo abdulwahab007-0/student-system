@@ -14,66 +14,100 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// ── Helper: Auto-generate 'absent' records for a class on a given date ──
-// For every scheduled period that falls on `date`'s weekday, any ACTIVE student
-// in `className` who did NOT mark attendance gets an 'absent' record. Presence
-// is stored separately from the approval status; both are set to 'absent' so
-// these are final (not pending approval) and don't clutter the review queue.
-// Returns a count of how many absent records were created.
-async function ensureAbsentRecords(className, date) {
-  if (!className || !date) return 0;
-  // Never auto-mark students absent for a future date (period could still be open)
-  const todayIso = (() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  })();
-  if (date > todayIso) return 0;
-  // Deterministic weekday name (locale-independent)
+// ── Shared helpers ──
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const dayNameForDate = (date) => {
   const valid = new Date(date + 'T00:00:00');
-  const dayName = Number.isNaN(valid.getTime()) ? '' : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][valid.getDay()];
+  return Number.isNaN(valid.getTime()) ? '' : ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][valid.getDay()];
+};
+const isoFmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const periodMarkedAt = (timeRange) => {
+  const m = /-\s*(\d{1,2}):(\d{2})/.exec(timeRange || '');
+  return m ? `${m[1].padStart(2,'0')}:${m[2]}` : '23:59';
+};
+
+// ── Bulk absent record generation (one call replaces 30-60 per-day loops) ──
+// Fetches schedule + students ONCE, then iterates every date in the range,
+// inserting absent records for scheduled periods with no existing mark.
+// Uses multi-row INSERT for much faster bulk writes.
+const absentGenCache = new Map(); // className → { end, ts }  (guard against re-running within 2 min)
+
+async function bulkEnsureAbsentRecords(className, startDate, endDate) {
+  if (!className || !startDate || !endDate) return 0;
+  const limitISO = todayISO();
+  const effectiveEnd = endDate > limitISO ? limitISO : endDate;
+  if (startDate > effectiveEnd) return 0;
+
+  // Guard: skip if we already generated for this class up to effectiveEnd within 2 minutes
+  const cached = absentGenCache.get(className);
+  const now = Date.now();
+  if (cached && cached.end >= effectiveEnd && now - cached.ts < 120_000) return 0;
+
   const schedule = await db.get('SELECT structure FROM class_schedules WHERE className = ?', [className]);
-  let periods = [];
-  if (schedule) {
-    try {
-      const parsed = JSON.parse(schedule.structure || '{}');
-      const day = (parsed.days || []).find(d => d.name === dayName);
-      periods = (day && day.periods) ? day.periods : [];
-    } catch { /* ignore malformed schedule */ }
-  }
-  if (periods.length === 0) return 0;
+  let allParsed = {};
+  if (schedule) { try { allParsed = JSON.parse(schedule.structure || '{}'); } catch {} }
 
-  const students = await db.all(
-    "SELECT id, name FROM students WHERE className = ? AND status = 'Active'",
-    [className]
+  const students = await db.all("SELECT id, name FROM students WHERE className = ? AND status = 'Active'", [className]);
+  if (students.length === 0) return 0;
+
+  // ONE query for all existing records in the range
+  const existingRows = await db.all(
+    "SELECT studentId, periodIndex, scheduledDate FROM attendance_records WHERE className = ? AND scheduledDate BETWEEN ? AND ?",
+    [className, startDate, effectiveEnd]
   );
+  const existingSet = new Set(existingRows.map(r => `${r.studentId}|${r.periodIndex}|${r.scheduledDate}`));
 
-  // Already-existing (studentId, periodIndex) pairs for this class/date
-  const existingKeys = new Set(
-    (await db.all(
-      "SELECT studentId || '|' || periodIndex AS k FROM attendance_records WHERE className = ? AND scheduledDate = ?",
-      [className, date]
-    )).map(r => r.k)
-  );
+  const nowISO = new Date().toISOString();
+  const start = new Date(startDate + 'T00:00:00');
+  const end = new Date(effectiveEnd + 'T00:00:00');
 
-  const now = new Date().toISOString();
-  // markedAt is the period's end time (the latest moment the student could have marked)
-  const periodMarkedAt = (timeRange) => {
-    const m = /-\s*(\d{1,2}):(\d{2})/.exec(timeRange || '');
-    return m ? `${m[1].padStart(2, '0')}:${m[2]}` : '23:59';
-  };
-  const createAbsent = db.transaction(async ({ run }) => {
-    let created = 0;
+  // Collect all rows to insert, then do a single multi-row INSERT
+  const rows = [];
+  for (let t = new Date(start); t <= end; t.setDate(t.getDate() + 1)) {
+    const date = isoFmt(t);
+    const dayName = dayNameForDate(date);
+    if (!dayName) continue;
+    const dayDef = (allParsed.days || []).find(d => d.name === dayName);
+    const periods = (dayDef && dayDef.periods) ? dayDef.periods : [];
+    if (periods.length === 0) continue;
     for (let pi = 0; pi < periods.length; pi++) {
       for (const s of students) {
-        if (existingKeys.has(`${s.id}|${pi}`)) continue;
-        await run('INSERT INTO attendance_records (className, subject, day, periodIndex, studentId, studentName, status, presence, markedAt, scheduledDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [className, null, dayName, pi, s.id, s.name, 'absent', 'absent', periodMarkedAt(periods[pi]), date, now]);
-        created++;
+        const key = `${s.id}|${pi}|${date}`;
+        if (existingSet.has(key)) continue;
+        rows.push([className, null, dayName, pi, s.id, s.name, 'absent', 'absent', periodMarkedAt(periods[pi]), date, nowISO]);
+        existingSet.add(key);
       }
     }
-    return created;
+  }
+
+  if (rows.length === 0) return 0;
+
+  // Multi-row INSERT: batch in chunks of 50 rows to avoid SQL parameter limits
+  const CHUNK = 50;
+  const bulkInsert = db.transaction(async ({ run }) => {
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const chunk = rows.slice(i, i + CHUNK);
+      const placeholders = chunk.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
+      const params = chunk.flat();
+      await run(
+        `INSERT INTO attendance_records (className, subject, day, periodIndex, studentId, studentName, status, presence, markedAt, scheduledDate, createdAt) VALUES ${placeholders}`,
+        params
+      );
+    }
+    return rows.length;
   });
-  return createAbsent();
+
+  const created = await bulkInsert();
+  absentGenCache.set(className, { end: effectiveEnd, ts: Date.now() });
+  return created;
+}
+
+// Single-day wrapper (kept for ensureAbsentRecords callers like POST /mark)
+async function ensureAbsentRecords(className, date) {
+  return bulkEnsureAbsentRecords(className, date, date);
 }
 
 // ── Geofence CRUD ──
@@ -266,19 +300,15 @@ router.get('/student-records', requirePermission('view_attendance_report'), asyn
     if (from) { query += ' AND scheduledDate >= ?'; params.push(from); }
     if (to) { query += ' AND scheduledDate <= ?'; params.push(to); }
 
-    // Auto-generate 'absent' records for the student's own scheduled periods in
-    // this date range that they never marked (so attendance history shows absences).
+    // Bulk-generate 'absent' records for the whole date range in ONE pass
     if (student.className && from && to) {
-      const MAX_GEN_DAYS = 60; // safety cap so huge date ranges don't loop forever
+      const MAX_GEN_DAYS = 60;
       let start = new Date(from + 'T00:00:00');
       const end = new Date(to + 'T00:00:00');
       if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
         const rangeDays = Math.round((end - start) / 86400000);
         if (rangeDays > MAX_GEN_DAYS) start = new Date(end.getTime() - MAX_GEN_DAYS * 86400000);
-        const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        for (let t = new Date(start); t <= end; t.setDate(t.getDate() + 1)) {
-          await ensureAbsentRecords(student.className, iso(t));
-        }
+        await bulkEnsureAbsentRecords(student.className, isoFmt(start), isoFmt(end));
       }
     }
 
@@ -340,13 +370,11 @@ router.get('/my', requirePermission('view_own_attendance'), async (req, res) => 
     }
     // Auto-generate 'absent' records for the student's scheduled periods over the
     // last 30 days that they never marked, so "My Attendance" shows absences too.
+    // Uses bulkEnsureAbsentRecords to do this in ONE pass instead of 30 loops.
     if (student.className) {
       const today = new Date();
       const start = new Date(today.getTime() - 30 * 86400000);
-      const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      for (let t = new Date(start); t <= today; t.setDate(t.getDate() + 1)) {
-        await ensureAbsentRecords(student.className, iso(t));
-      }
+      await bulkEnsureAbsentRecords(student.className, isoFmt(start), isoFmt(today));
     }
     const records = await db.all(
       'SELECT * FROM attendance_records WHERE studentId = ? ORDER BY scheduledDate DESC, periodIndex ASC',

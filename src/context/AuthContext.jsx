@@ -81,21 +81,32 @@ export function AuthProvider({ children }) {
     const rolePermissionsDirty = useRef(false);
     const userPermissionsDirty = useRef(false);
 
+    // Load users + permission overrides from the single /api/bootstrap payload.
+    // DataContext uses the same request and api.getBootstrap() dedupes them
+    // into ONE HTTP call. Students get users:[] yet still receive the override
+    // maps — exactly what the old separate endpoints provided, minus the 403s.
+    const applyBootstrapAuth = (data) => {
+        if (Array.isArray(data.users)) {
+            setUsers(data.users.filter(u => u.status === "approved"));
+            setPendingUsers(data.users.filter(u => u.status === "pending"));
+        }
+        rolePermissionsDirty.current = false;
+        setRolePermissions(data.rolePermissions || {});
+        userPermissionsDirty.current = false;
+        setUserPermissionsState(data.userPermissions || {});
+    };
+
+    const loadBootstrap = async () => {
+        try {
+            applyBootstrapAuth(await api.getBootstrap());
+        } catch { /* network hiccup — app renders with defaults */ }
+    };
+
     useEffect(() => {
         if (!currentUser) return;
-        api.getUsers().then(all => {
-            setUsers(all.filter(u => u.status === "approved"));
-            setPendingUsers(all.filter(u => u.status === "pending"));
-        }).catch(() => {});
-        api.getPermissions().then(data => {
-            rolePermissionsDirty.current = false;
-            setRolePermissions(data);
-        }).catch(() => {});
-        api.getUserPermissions().then(data => {
-            userPermissionsDirty.current = false;
-            setUserPermissionsState(data);
-        }).catch(() => {});
-    }, []);
+        loadBootstrap();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentUser?.id]);
 
     // Keep auth in sync across browser tabs: when another tab logs in/out,
     // the storage event fires here so currentUser stays consistent everywhere.
@@ -107,15 +118,7 @@ export function AuthProvider({ children }) {
                 // A (different) user just signed in from another tab — refresh
                 // users/approvals and permissions so badges & rights are current.
                 if (saved) {
-                    refreshUsers();
-                    api.getPermissions().then(data => {
-                        rolePermissionsDirty.current = false;
-                        setRolePermissions(data);
-                    }).catch(() => {});
-                    api.getUserPermissions().then(data => {
-                        userPermissionsDirty.current = false;
-                        setUserPermissionsState(data);
-                    }).catch(() => {});
+                    loadBootstrap();
                 }
             } else if (e.key === "sms_token" && !e.newValue) {
                 // Token removed in another tab → treat as logged out here too.
@@ -142,15 +145,7 @@ export function AuthProvider({ children }) {
             setCurrentUser(user);
             localStorage.setItem("ncba_current_user", JSON.stringify(user));
             showToast(`Welcome back, ${user.fullName}!`, "success");
-            await refreshUsers();
-            try {
-                rolePermissionsDirty.current = false;
-                setRolePermissions(await api.getPermissions());
-            } catch {}
-            try {
-                userPermissionsDirty.current = false;
-                setUserPermissionsState(await api.getUserPermissions());
-            } catch {}
+            await loadBootstrap();
             return { success: true, user };
         } catch (err) {
             const msg = err.message || "";

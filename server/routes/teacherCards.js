@@ -57,27 +57,70 @@ function deleteOldPhoto(photoUrl) {
   }
 }
 
-// GET / — every known teacher with their card state
+// GET / — every known teacher with their card state (batch-loaded, no N+1)
 router.get('/', requirePermission('view_teacher_cards'), async (req, res) => {
   try {
     const names = await listTeacherNames();
-    const rows = [];
-    for (const name of names) {
-      const info = await teacherInfo(name);
-      const card = await ensureCardRow(name);
-      rows.push({
-        name,
-        className: info.className,
-        subjects: info.subjects,
-        cardId: card.id,
-        photoUrl: card.photoUrl,
-        photoMime: card.photoMime,
-        cardStatus: card.cardStatus || 'none',
-        reviewNote: card.reviewNote,
-        reviewedBy: card.reviewedBy,
-        issuedAt: card.issuedAt,
-      });
+    if (names.length === 0) return res.json([]);
+
+    // Batch: load all subjects for every teacher in ONE query
+    const allSubjects = await db.all(
+      `SELECT DISTINCT teacher, name, code, className FROM subjects WHERE trim(teacher) IN (${names.map(() => '?').join(',')})`,
+      names
+    );
+    const subjectsByName = {};
+    for (const s of allSubjects) {
+      const n = (s.teacher || '').trim();
+      if (!subjectsByName[n]) subjectsByName[n] = [];
+      subjectsByName[n].push({ name: s.name, code: s.code, className: s.className });
     }
+
+    // Batch: load all existing card rows in ONE query; auto-create missing ones
+    const existingCards = await db.all(
+      `SELECT * FROM teacher_cards WHERE teacherName IN (${names.map(() => '?').join(',')})`,
+      names
+    );
+    const cardsByName = {};
+    for (const c of existingCards) cardsByName[c.teacherName] = c;
+
+    // Auto-create card rows for teachers that don't have one yet
+    const missing = names.filter(n => !cardsByName[n]);
+    if (missing.length > 0) {
+      const now = new Date().toISOString();
+      const insertTx = db.transaction(async ({ run }) => {
+        for (const n of missing) {
+          await run('INSERT INTO teacher_cards (teacherName, cardStatus, updatedAt) VALUES (?, ?, ?)',
+            [n, 'none', now]);
+        }
+      });
+      await insertTx();
+      // Re-fetch the newly created rows
+      if (missing.length > 0) {
+        const newCards = await db.all(
+          `SELECT * FROM teacher_cards WHERE teacherName IN (${missing.map(() => '?').join(',')})`,
+          missing
+        );
+        for (const c of newCards) cardsByName[c.teacherName] = c;
+      }
+    }
+
+    const rows = names.map(name => {
+      const enrolled = subjectsByName[name] || [];
+      const classes = [...new Set(enrolled.map(s => s.className).filter(Boolean))];
+      const card = cardsByName[name];
+      return {
+        name,
+        className: classes.join(', '),
+        subjects: enrolled.map(s => ({ name: s.name, code: s.code, className: s.className })),
+        cardId: card?.id,
+        photoUrl: card?.photoUrl,
+        photoMime: card?.photoMime,
+        cardStatus: card?.cardStatus || 'none',
+        reviewNote: card?.reviewNote,
+        reviewedBy: card?.reviewedBy,
+        issuedAt: card?.issuedAt,
+      };
+    });
     res.json(rows);
   } catch (err) {
     console.error('Error listing teacher cards:', err);

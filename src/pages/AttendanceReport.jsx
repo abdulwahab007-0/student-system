@@ -87,7 +87,10 @@ function AttendanceReport() {
     const target = cls ?? className;
     if (!target) { showToast('Select a class first', 'error'); return; }
     if (!fromDate || !toDate) { showToast('Set the date range first', 'error'); return; }
-    setLoading(true);
+    // Paint the cached report rows instantly before revalidation
+    const cached = api.getSwrCache('/attendance/report');
+    if (cached && Array.isArray(cached.rows)) { setRows(cached.rows); setLoading(false); }
+    else setLoading(true);
     try {
       const data = await api.getAttendanceReport({ className: target, from: fromDate, to: toDate });
       setRows(data.rows || []);

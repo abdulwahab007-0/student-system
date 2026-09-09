@@ -32,7 +32,10 @@ function StudentCards() {
 
   const loadCards = async () => {
     try {
-      setLoading(true);
+      // Paint cached copy instantly (no spinner) before background refresh
+      const cached = api.getSwrCache('/cards');
+      if (cached) { setCards(cached); setLoading(false); }
+      else setLoading(true);
       setCards(await api.getStudentCards());
     } catch (err) {
       showToast(err.message, 'error');

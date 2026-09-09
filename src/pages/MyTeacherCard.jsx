@@ -17,7 +17,9 @@ function MyTeacherCard() {
 
   const load = async () => {
     try {
-      setLoading(true);
+      const cached = api.getSwrCache('/teacher-cards/my');
+      if (cached) { setData(cached); setLoading(false); }
+      else setLoading(true);
       setData(await api.getMyTeacherCard());
     } catch (err) {
       showToast(err.message, 'error');

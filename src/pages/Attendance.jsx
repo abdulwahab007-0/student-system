@@ -59,6 +59,9 @@ function StudentMark({ student }) {
 
   const loadMyRecords = async () => {
     try {
+      // Paint the previous records instantly, then revalidate in the background
+      const cached = api.getSwrCache(`/attendance/student/${student.id}`);
+      if (cached && Array.isArray(cached)) setMyRecords(cached);
       const recs = await api.getStudentAttendance(student.id);
       setMyRecords(recs);
     } catch {}
@@ -428,12 +431,15 @@ function AdminReview({ canApprove }) {
   const [viewDetails, setViewDetails] = useState(null);
 
   const loadRecords = useCallback(async () => {
-    setLoading(true);
     try {
       const params = {};
       if (filterClass) params.className = filterClass;
       if (filterStatus) params.status = filterStatus;
       if (filterDate) params.date = filterDate;
+      // Paint the previous match instantly (no spinner) before revalidation
+      const cached = api.getSwrCache('/attendance/records');
+      if (cached && Array.isArray(cached)) { setRecords(cached); setLoading(false); }
+      else setLoading(true);
       const data = await api.getAttendanceRecords(params);
       setRecords(data);
     } catch (err) {

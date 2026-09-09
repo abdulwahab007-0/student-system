@@ -232,3 +232,19 @@ CREATE INDEX IF NOT EXISTS idx_attendance_class_date ON attendance_records (clas
 --   CREATE POLICY "app_full_access" ON users FOR ALL USING (true) WITH CHECK (true);
 --   -- …repeat for every table above…
 CREATE INDEX IF NOT EXISTS idx_user_permissions_user ON user_permissions (userId);
+
+-- ── Performance indexes ────────────────────────────────────────────────────
+-- Speed up the class-filter, marks-by-student and login lookups that run on
+-- every page load. Idempotent: safe to re-run in the SQL editor.
+CREATE INDEX IF NOT EXISTS idx_students_className ON students (className);
+CREATE INDEX IF NOT EXISTS idx_subjects_className ON subjects (className);
+CREATE INDEX IF NOT EXISTS idx_marks_studentId ON marks (studentId);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);
+
+-- Attendance: speed up student history, absent-generation batch, and report queries
+CREATE INDEX IF NOT EXISTS idx_attendance_student_date ON attendance_records (studentId, scheduledDate);
+CREATE INDEX IF NOT EXISTS idx_attendance_createdAt ON attendance_records (createdAt);
+-- Card tables
+CREATE INDEX IF NOT EXISTS idx_student_cards_studentId ON student_cards (studentId);
+CREATE INDEX IF NOT EXISTS idx_teacher_cards_name ON teacher_cards (teacherName);
+CREATE INDEX IF NOT EXISTS idx_subjects_teacher ON subjects (teacher);

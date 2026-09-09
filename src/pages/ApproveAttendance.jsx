@@ -108,7 +108,6 @@ function ApproveAttendance() {
   const [bulkDelete, setBulkDelete] = useState(false);    // confirm bulk delete
 
   const loadRecords = useCallback(async () => {
-    setLoading(true);
     try {
       const params = {};
       if (filterClass) params.className = filterClass;
@@ -116,6 +115,10 @@ function ApproveAttendance() {
       if (filterPresence) params.presence = filterPresence;
       if (filterDate) params.date = filterDate;
       if (debouncedSearch) params.search = debouncedSearch;
+      // Paint the previous match instantly (no spinner) before revalidation
+      const cached = api.getSwrCache('/attendance/records');
+      if (cached && Array.isArray(cached)) { setRecords(cached); setLoading(false); }
+      else setLoading(true);
       const data = await api.getAttendanceRecords(params);
       setRecords(data);
     } catch (err) {

@@ -232,6 +232,29 @@ export function initDatabase() {
             db.exec("ALTER TABLE attendance_records ADD COLUMN presence TEXT NOT NULL DEFAULT 'present'");
         }
     }
+
+    // Performance indexes for the queries the app runs most (idempotent):
+    // class-filter lookups (students/subjects by className), marks by student,
+    // and the login / username lookups.
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_students_className ON students(className);
+      CREATE INDEX IF NOT EXISTS idx_subjects_className ON subjects(className);
+      CREATE INDEX IF NOT EXISTS idx_marks_studentId ON marks(studentId);
+      CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+      -- Attendance: speed up the hot queries (student/records, absent generation, report)
+      CREATE INDEX IF NOT EXISTS idx_attendance_studentId ON attendance_records(studentId);
+      CREATE INDEX IF NOT EXISTS idx_attendance_class_date ON attendance_records(className, scheduledDate);
+      CREATE INDEX IF NOT EXISTS idx_attendance_student_date ON attendance_records(studentId, scheduledDate);
+      CREATE INDEX IF NOT EXISTS idx_attendance_status ON attendance_records(status);
+      CREATE INDEX IF NOT EXISTS idx_attendance_createdAt ON attendance_records(createdAt);
+      -- Card tables
+      CREATE INDEX IF NOT EXISTS idx_student_cards_studentId ON student_cards(studentId);
+      CREATE INDEX IF NOT EXISTS idx_student_cards_status ON student_cards(cardStatus);
+      CREATE INDEX IF NOT EXISTS idx_teacher_cards_name ON teacher_cards(teacherName);
+      CREATE INDEX IF NOT EXISTS idx_teacher_cards_status ON teacher_cards(cardStatus);
+      -- Subjects by teacher (teacher cards JOIN)
+      CREATE INDEX IF NOT EXISTS idx_subjects_teacher ON subjects(teacher);
+    `);
 }
 
 function seedStudents(iS) {

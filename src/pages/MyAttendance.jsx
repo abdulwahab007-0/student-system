@@ -54,8 +54,10 @@ function MyAttendance() {
   }, [fromDate, toDate]);
 
   const load = async () => {
-    setLoading(true);
     try {
+      const cached = api.getSwrCache('/attendance/my');
+      if (cached) { setRecords(cached.records || []); setStudent(cached.student || null); setLoading(false); }
+      else setLoading(true);
       const data = await api.getMyAttendance();
       setRecords(data.records || []);
       setStudent(data.student || null);
