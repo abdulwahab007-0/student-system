@@ -129,10 +129,10 @@ function Layout() {
         {/* Logo / Brand */}
         <div className="sidebar-brand">
           <div className="sidebar-brand-icon">
-            <img src="/ncba-logo.webp" alt="NCBA&F Logo" style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'contain' }} />
+            <img src="/ncba-logo.webp" alt="NCBA&E Logo" style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'contain' }} />
           </div>
           <div className="sidebar-brand-text">
-            <span className="sidebar-brand-name">NCBA &amp; E</span>
+            <span className="sidebar-brand-name">NCBA&amp;E</span>
             <span className="sidebar-brand-sub">Student Management</span>
           </div>
         </div>
@@ -255,7 +255,7 @@ function Layout() {
           borderTop: '1px solid var(--border)',
           background: 'var(--white)'
         }}>
-          NCBA & E © 2026 - Student Management System
+          NCBA&E © 2026 - Student Management System
         </footer>
       </div>
 

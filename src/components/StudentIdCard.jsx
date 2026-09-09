@@ -14,7 +14,7 @@ function ShieldLogo({ size = 32 }) {
   return (
     <img
       src="/ncba-logo.webp"
-      alt="NCBA&F Shield"
+      alt="NCBA&E Shield"
       className="id-card-shield-logo"
       style={{ width: size, height: size, objectFit: 'contain', borderRadius: 4, flexShrink: 0 }}
     />

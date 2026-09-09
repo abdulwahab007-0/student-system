@@ -108,8 +108,8 @@ function Dashboard() {
         <h1>{isStudent ? 'My Dashboard' : 'Dashboard Overview'}</h1>
         <p>
           {isStudent
-            ? `Welcome, ${currentUser?.fullName}! Here's your academic overview at NCBA & E.`
-            : "Welcome to the NCBA & E Student Management System. Here's what's happening in your institution."}
+            ? `Welcome, ${currentUser?.fullName}! Here's your academic overview at NCBA&E.`
+            : "Welcome to the NCBA&E Student Management System. Here's what's happening in your institution."}
         </p>
       </div>
 

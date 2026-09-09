@@ -122,9 +122,9 @@ function Register() {
       <div className="auth-card">
         <div className="auth-logo">
           <div className="auth-logo-icon">
-            <img src="/ncba-logo.webp" alt="NCBA&F Logo" />
+            <img src="/ncba-logo.webp" alt="NCBA&E Logo" />
           </div>
-          <h1>NCBA <span>&amp;</span> E</h1>
+          <h1>NCBA&amp;E</h1>
           <p>Student Management System</p>
         </div>
 

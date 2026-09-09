@@ -88,7 +88,7 @@ function Approvals() {
     <div>
       <div className="page-header">
         <h1>Registration Approvals</h1>
-        <p>Review and approve new user registrations for NCBA & E.</p>
+        <p>Review and approve new user registrations for NCBA&E.</p>
       </div>
 
       {/* Stats */}

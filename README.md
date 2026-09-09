@@ -1,6 +1,6 @@
-# 🎓 NCBA & E - Student Management System
+# 🎓 NCBA&E - Student Management System
 
-A modern, feature-rich front-end for managing students, teachers, subjects, and marks at National College of Business Administration & Economics (NCBA & E).
+A modern, feature-rich front-end for managing students, teachers, subjects, and marks at National College of Business Administration & Economics (NCBA&E).
 
 ## 🔐 Authentication & Roles
 

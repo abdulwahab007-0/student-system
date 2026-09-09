@@ -18,7 +18,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-const DEFAULT_CENTER = [24.8607, 67.0011]; // Karachi (NCBA & E)
+const DEFAULT_CENTER = [24.8607, 67.0011]; // Karachi (NCBA&E)
 const DEFAULT_ZOOM = 14;
 
 function CenteredMarker({ marker, onMove }) {
