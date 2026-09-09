@@ -1,11 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useData } from '../context/DataContext';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
-import { getAllClassSuggestions } from '../utils/classUtils';
-import ClassInput from '../components/ClassInput';
 import Icon from '../components/Icon';
 import ImportModal from '../components/ImportModal';
 
@@ -37,7 +35,26 @@ const emptyTeacher = {
   joiningDate: ''
 };
 
-function TeacherForm({ teacher, onSave, onCancel, classSuggestions, subjects = [] }) {
+// The teacher's class(es) are sourced from the SUBJECTS table: the classes a
+// teacher teaches are the distinct `className` values of the subjects assigned
+// to that teacher (linked by name). This keeps Teacher → Class in sync with the
+// Subjects module instead of a separate, manually-typed value.
+function deriveTeacherClasses(teacherName, subjects = []) {
+  const name = (teacherName || '').trim().toLowerCase();
+  if (!name) return [];
+  const classes = new Set();
+  subjects.forEach(s => {
+    if ((s.teacher || '').trim().toLowerCase() !== name) return;
+    (s.className || '')
+      .split(',')
+      .map(c => c.trim())
+      .filter(Boolean)
+      .forEach(c => classes.add(c));
+  });
+  return [...classes].sort();
+}
+
+function TeacherForm({ teacher, onSave, onCancel, subjects = [] }) {
   const [form, setForm] = useState({ ...emptyTeacher, ...(teacher || {}) });
 
   const handleChange = (e) => {
@@ -45,13 +62,25 @@ function TeacherForm({ teacher, onSave, onCancel, classSuggestions, subjects = [
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
+  // Classes come from the Subjects module (subjects assigned to this teacher).
+  const derivedClasses = deriveTeacherClasses(form.name, subjects);
+
+  // Keep the class field in sync with the teacher's subjects whenever the name
+  // or the linked subjects change, so the class always reflects the Subjects
+  // module instead of a manually-typed value.
+  useEffect(() => {
+    const derived = derivedClasses.join(', ');
+    setForm(prev => (prev.className === derived ? prev : { ...prev, className: derived }));
+  }, [derivedClasses.join(', ')]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.name.trim() || !form.subject.trim()) {
       alert('Name and subject are required fields.');
       return;
     }
-    onSave(form);
+    // Persist the derived classes (from the teacher's subjects).
+    onSave({ ...form, className: derivedClasses.join(', ') });
   };
 
   // Deduplicate subject names from DB for the dropdown
@@ -127,13 +156,18 @@ function TeacherForm({ teacher, onSave, onCancel, classSuggestions, subjects = [
         </div>
         <div className="form-group">
           <label>Assigned Class</label>
-          <ClassInput
-            id="teacher-class-suggestions"
+          <input
+            type="text"
+            name="className"
             value={form.className}
-            onChange={(e) => setForm(prev => ({ ...prev, className: e.target.value }))}
-            suggestions={classSuggestions || []}
-            placeholder="Type or select a class e.g. BSCS"
+            readOnly
+            title="Classes are taken automatically from the subjects assigned to this teacher."
+            placeholder="Auto-filled from this teacher's subjects (e.g. BSCS, BSIT)"
           />
+          <small className="hint-text">
+            Automatically taken from the <strong>Subjects</strong> assigned to this teacher — edit the
+            subject's class(es) on the Subjects page to change them.
+          </small>
         </div>
         <div className="form-group">
           <label>Joining Date</label>
@@ -155,7 +189,7 @@ function TeacherForm({ teacher, onSave, onCancel, classSuggestions, subjects = [
   );
 }
 
-function TeacherDetails({ teacher, onClose, onEdit }) {
+function TeacherDetails({ teacher, subjects = [], onClose, onEdit }) {
   const color = getAvatarColor(teacher.name);
   return (
     <Modal
@@ -197,7 +231,7 @@ function TeacherDetails({ teacher, onClose, onEdit }) {
         </div>
         <div className="detail-item">
           <span className="label">Assigned Class</span>
-          <span className="value">{teacher.className || '—'}</span>
+          <span className="value">{deriveTeacherClasses(teacher.name, subjects).join(', ') || '—'}</span>
         </div>
         <div className="detail-item">
           <span className="label">Joining Date</span>
@@ -209,7 +243,7 @@ function TeacherDetails({ teacher, onClose, onEdit }) {
 }
 
 function Teachers() {
-  const { teachers, students, subjects, classes, addTeacher, updateTeacher, deleteTeacher } = useData();
+  const { teachers, subjects, addTeacher, updateTeacher, deleteTeacher } = useData();
   const { hasPermission } = useAuth();
   const showToast = useToast();
   const [search, setSearch] = useState('');
@@ -230,7 +264,6 @@ function Teachers() {
   });
 
   const subjectList = [...new Set(teachers.map(t => t.subject))].sort();
-  const classSuggestions = getAllClassSuggestions(classes, students, teachers, subjects, { officialOnly: true });
 
   const handleSave = async (formData) => {
     try {
@@ -330,7 +363,7 @@ function Teachers() {
                 </div>
                 <div className="subject-meta-item">
                   <span className="subject-icon"><Icon name="building" size={13} /></span>
-                  <span>Class: <span className="meta-value">{teacher.className || '—'}</span></span>
+                  <span>Class: <span className="meta-value">{deriveTeacherClasses(teacher.name, subjects).join(', ') || '—'}</span></span>
                 </div>
                 <div className="subject-meta-item">
                   <span className="subject-icon"><Icon name="calendar" size={13} /></span>
@@ -372,7 +405,6 @@ function Teachers() {
             teacher={editingTeacher}
             onSave={handleSave}
             onCancel={() => { setShowModal(false); setEditingTeacher(null); }}
-            classSuggestions={classSuggestions}
             subjects={subjects}
           />
         </Modal>
@@ -382,6 +414,7 @@ function Teachers() {
       {viewingTeacher && (
         <TeacherDetails
           teacher={viewingTeacher}
+          subjects={subjects}
           onClose={() => setViewingTeacher(null)}
           onEdit={handleEdit}
         />
