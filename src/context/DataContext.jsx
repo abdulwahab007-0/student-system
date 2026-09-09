@@ -153,22 +153,45 @@ export function DataProvider({ children }) {
   };
 
   // ── Subject CRUD ──
+  // Recompute each teacher's className from the (updated) subjects list, so the
+  // teachers array on the client stays in sync with the classes selected on the
+  // subjects that teacher teaches. Same rule as the server-side sync.
+  const recomputeTeacherClasses = (subjectsList) => {
+    setTeachers(prev => prev.map(t => {
+      const name = (t.name || '').trim().toLowerCase();
+      if (!name) return t;
+      const classes = new Set();
+      subjectsList.forEach(s => {
+        if ((s.teacher || '').trim().toLowerCase() !== name) return;
+        (s.className || '').split(',').map(c => c.trim()).filter(Boolean).forEach(c => classes.add(c));
+      });
+      const joined = [...classes].sort().join(', ');
+      return t.className === joined ? t : { ...t, className: joined };
+    }));
+  };
+
   const addSubject = async (data) => {
     const created = await api.createSubject(data);
-    setSubjects(prev => [...prev, created]);
+    const next = [...subjects, created];
+    setSubjects(next);
+    recomputeTeacherClasses(next);   // keep teachers' classes in sync from subjects
     api.invalidateSwr('/teacher-cards', '/teacher-cards/my');   // subjects drive the teacher roster
     bumpDataVersion();
     return created.id;
   };
   const updateSubject = async (id, data) => {
     const updated = await api.updateSubject(id, data);
-    setSubjects(prev => prev.map(s => s.id === id ? updated : s));
+    const next = subjects.map(s => s.id === id ? updated : s);
+    setSubjects(next);
+    recomputeTeacherClasses(next);   // keep teachers' classes in sync from subjects
     api.invalidateSwr('/teacher-cards', '/teacher-cards/my');   // teacher field may change
     bumpDataVersion();
   };
   const deleteSubject = async (id) => {
     await api.deleteSubject(id);
-    setSubjects(prev => prev.filter(s => s.id !== id));
+    const next = subjects.filter(s => s.id !== id);
+    setSubjects(next);
+    recomputeTeacherClasses(next);   // keep teachers' classes in sync from subjects
     api.invalidateSwr('/teacher-cards', '/teacher-cards/my');   // a teacher may disappear
     bumpDataVersion();
   };
