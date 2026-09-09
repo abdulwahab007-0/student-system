@@ -46,9 +46,30 @@ function parseTimeRange(timeRange) {
   return { start, end };
 }
 
-// minute-of-day for a Date (server-local time)
-function minutesOfDay(d) {
-  return d.getHours() * 60 + d.getMinutes();
+// ── Timezone-aware helpers ──────────────────────────────────────────────
+// On Vercel the server runs in UTC, but schedule times are in the school's
+// local timezone (e.g. Asia/Karachi, UTC+5).  SCHEDULE_TIMEZONE tells us
+// which IANA timezone to use.  We use the Intl API to extract hours/minutes
+// in that timezone — no external libraries needed.
+const SCHEDULE_TZ = process.env.SCHEDULE_TIMEZONE || 'Asia/Karachi';
+
+// Returns { hours, minutes, formatted } for "now" in the configured timezone.
+function localNow() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: SCHEDULE_TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+  const h = Number(parts.find(p => p.type === 'hour').value);
+  const m = Number(parts.find(p => p.type === 'minute').value);
+  return { hours: h, minutes: m, formatted: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}` };
+}
+
+// minute-of-day in the configured schedule timezone
+function localMinutesOfDay() {
+  const { hours, minutes } = localNow();
+  return hours * 60 + minutes;
 }
 
 // ── Bulk absent record generation (one call replaces 30-60 per-day loops) ──
@@ -201,7 +222,7 @@ router.post('/mark', requirePermission('mark_attendance'), async (req, res) => {
       const timeRange = (dayDef && dayDef.periods && dayDef.periods[periodIndex]) || null;
       const win = timeRange ? parseTimeRange(timeRange) : null;
       if (win) {
-        const now = minutesOfDay(new Date());
+        const now = localMinutesOfDay();
         if (now < win.start) {
           windowBlocked = { error: 'You cannot mark attendance before the lecture time' };
         } else if (now > win.end) {
@@ -273,11 +294,10 @@ router.post('/mark', requirePermission('mark_attendance'), async (req, res) => {
     }
 
     // All marks start as 'pending' — admins approve or reject
-    const now = new Date();
-    const markedTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const markedTime = localNow().formatted;
     const status = 'pending';
 
-    const nowISO = now.toISOString();
+    const nowISO = new Date().toISOString();
     const subjectOrNull = subject || null;
     const latOrNull = latitude || null;
     const lngOrNull = longitude || null;
