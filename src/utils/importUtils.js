@@ -27,6 +27,7 @@ export const ENTITY_COLUMNS = {
       { key: 'email', aliases: ['email', 'emailaddress'] },
       { key: 'phone', aliases: ['phone', 'mobile', 'contact'] },
       { key: 'subject', aliases: ['subject', 'subjectname', 'course'] },
+      { key: 'subjectCode', aliases: ['subjectcode', 'code'] },
       { key: 'qualification', aliases: ['qualification', 'degree'] },
       { key: 'experience', aliases: ['experience', 'years'] },
       { key: 'className', aliases: ['classname', 'class', 'section'] },

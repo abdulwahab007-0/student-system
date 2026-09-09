@@ -153,20 +153,27 @@ export function DataProvider({ children }) {
   };
 
   // ── Subject CRUD ──
-  // Recompute each teacher's className from the (updated) subjects list, so the
-  // teachers array on the client stays in sync with the classes selected on the
-  // subjects that teacher teaches. Same rule as the server-side sync.
+  // Recompute each teacher's className AND subject from the (updated) subjects
+  // list, so the teachers array on the client stays in sync with the classes and
+  // class subject selected on the subjects that teacher teaches. Same rule as the
+  // server-side sync (server/routes/teachers.js + subjects.js).
   const recomputeTeacherClasses = (subjectsList) => {
     setTeachers(prev => prev.map(t => {
       const name = (t.name || '').trim().toLowerCase();
       if (!name) return t;
+      const mine = subjectsList.filter(s => (s.teacher || '').trim().toLowerCase() === name);
       const classes = new Set();
-      subjectsList.forEach(s => {
-        if ((s.teacher || '').trim().toLowerCase() !== name) return;
+      mine.forEach(s => {
         (s.className || '').split(',').map(c => c.trim()).filter(Boolean).forEach(c => classes.add(c));
       });
       const joined = [...classes].sort().join(', ');
-      return t.className === joined ? t : { ...t, className: joined };
+      // Inherit a subject name if the teacher has none assigned yet
+      let subject = t.subject;
+      if (!(subject || '').trim() && mine.length > 0 && mine[0].name) {
+        subject = mine[0].name;
+      }
+      if (t.className === joined && t.subject === subject) return t;
+      return { ...t, className: joined, subject };
     }));
   };
 

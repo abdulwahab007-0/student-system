@@ -100,7 +100,7 @@ function TeacherForm({ teacher, onSave, onCancel, subjects = [] }) {
       return;
     }
     // Persist the derived classes (from the teacher's subjects).
-    onSave({ ...form, className: derivedClasses.join(', ') });
+    onSave({ ...form, subjectCode, className: derivedClasses.join(', ') });
   };
 
   // Deduplicate subject names from DB for the dropdown
