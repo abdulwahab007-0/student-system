@@ -265,15 +265,30 @@ function Subjects() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {/* Students are locked to their own class: they can never change the
+              class filter (only head CR / teacher / admin can). The server also
+              scopes /api/subjects to the student's class, so this is both a UX
+              guarantee and a second safety layer. */}
           <select
             className="filter-select"
             value={filterClass}
             onChange={(e) => setFilterClass(e.target.value)}
+            disabled={currentUser?.role === 'student'}
           >
-            <option value="">All Classes</option>
-            {filterClassOptions.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
+            {currentUser?.role === 'student'
+              ? (
+                <option value={filterClass}>
+                  {filterClass || 'My Class'}
+                </option>
+              )
+              : (
+                <>
+                  <option value="">All Classes</option>
+                  {filterClassOptions.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </>
+              )}
           </select>
         </div>
         {hasPermission('add_subjects') && (
