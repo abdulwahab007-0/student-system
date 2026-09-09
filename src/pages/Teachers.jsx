@@ -55,11 +55,31 @@ function deriveTeacherClasses(teacherName, subjects = []) {
 }
 
 function TeacherForm({ teacher, onSave, onCancel, subjects = [] }) {
+  // `subjectCode` is a helper binding only (not saved to the DB): picking a
+  // subject's code auto-fills that subject's details (name + class) into the
+  // teacher record so there's no manual double entry.
   const [form, setForm] = useState({ ...emptyTeacher, ...(teacher || {}) });
+  const [subjectCode, setSubjectCode] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  // When a subject code is picked, look up that subject and auto-fill its
+  // details (subject name + class) into the teacher's fields.
+  const handleSubjectCode = (e) => {
+    const code = e.target.value;
+    setSubjectCode(code);
+    if (!code) return;
+    const match = subjects.find(s => (s.code || '').trim().toLowerCase() === code.trim().toLowerCase());
+    if (match) {
+      setForm(prev => ({
+        ...prev,
+        subject: match.name || '',
+        className: match.className || ''
+      }));
+    }
   };
 
   // Classes come from the Subjects module (subjects assigned to this teacher).
@@ -85,10 +105,29 @@ function TeacherForm({ teacher, onSave, onCancel, subjects = [] }) {
 
   // Deduplicate subject names from DB for the dropdown
   const subjectOptions = [...new Set(subjects.map(s => s.name).filter(Boolean))].sort();
+  // Deduplicate subject codes from DB for the code→details lookup
+  const subjectCodeOptions = [...new Set(subjects.map(s => s.code).filter(Boolean))].sort();
 
   return (
     <form onSubmit={handleSubmit}>
       <div className="form-grid">
+        <div className="form-group">
+          <label>Subject Code (auto-fill)</label>
+          <select
+            name="subjectCode"
+            value={subjectCode}
+            onChange={handleSubjectCode}
+          >
+            <option value="">— Pick a subject code to auto-fill —</option>
+            {subjectCodeOptions.map(code => (
+              <option key={code} value={code}>{code}</option>
+            ))}
+          </select>
+          <small className="hint-text">
+            Selecting a subject's code automatically fills its Subject name and
+            Class below — no manual entry needed.
+          </small>
+        </div>
         <div className="form-group">
           <label>Teacher Name *</label>
           <input
