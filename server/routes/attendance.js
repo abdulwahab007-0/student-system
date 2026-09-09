@@ -29,6 +29,28 @@ const periodMarkedAt = (timeRange) => {
   return m ? `${m[1].padStart(2,'0')}:${m[2]}` : '23:59';
 };
 
+// ── Lecture-time window enforcement ─────────────────────────────────────
+// Each period is a "HH:mm - HH:mm" range. Attendance may ONLY be marked while
+// the current time is inside [startTime, endTime]:
+//   • before the start  → "before the lecture time"  (blocked)
+//   • after  the end    → "after  the lecture time"  (blocked, treated as absent)
+// This applies to every period (1st, 2nd, 3rd, …) using that period's own window.
+// Returns { start, end } minute-of-day values for a time range, or null if the
+// range can't be parsed (callers then fall back to allowing the mark).
+function parseTimeRange(timeRange) {
+  const m = /(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/.exec(timeRange || '');
+  if (!m) return null;
+  const start = Number(m[1]) * 60 + Number(m[2]);
+  const end = Number(m[3]) * 60 + Number(m[4]);
+  if (Number.isNaN(start) || Number.isNaN(end)) return null;
+  return { start, end };
+}
+
+// minute-of-day for a Date (server-local time)
+function minutesOfDay(d) {
+  return d.getHours() * 60 + d.getMinutes();
+}
+
 // ── Bulk absent record generation (one call replaces 30-60 per-day loops) ──
 // Fetches schedule + students ONCE, then iterates every date in the range,
 // inserting absent records for scheduled periods with no existing mark.
@@ -164,6 +186,34 @@ router.post('/mark', requirePermission('mark_attendance'), async (req, res) => {
     const { className, subject, day, periodIndex, scheduledDate, latitude, longitude } = req.body;
     if (!className || !day || periodIndex == null || !scheduledDate) {
       return res.status(400).json({ error: 'className, day, periodIndex, and scheduledDate are required' });
+    }
+
+    // ── Enforce the lecture-time window ─────────────────────────────────
+    // Attendance may only be marked DURING the selected period's time window.
+    // Before the window → "before the lecture time"; after → "after the lecture
+    // time" (that period counts as absent). Applies to every period individually.
+    let windowBlocked = null; // { error }
+    try {
+      const schedule = await db.get('SELECT structure FROM class_schedules WHERE className = ?', [className]);
+      let structure = {};
+      if (schedule) { try { structure = JSON.parse(schedule.structure || '{}'); } catch { structure = {}; } }
+      const dayDef = (structure.days || []).find(d => d.name === day);
+      const timeRange = (dayDef && dayDef.periods && dayDef.periods[periodIndex]) || null;
+      const win = timeRange ? parseTimeRange(timeRange) : null;
+      if (win) {
+        const now = minutesOfDay(new Date());
+        if (now < win.start) {
+          windowBlocked = { error: 'You cannot mark attendance before the lecture time' };
+        } else if (now > win.end) {
+          windowBlocked = { error: 'You cannot mark attendance after the lecture time' };
+        }
+      }
+      // If no schedule/period/time was found, fall back to allowing the mark
+      // (no regression when the schedule isn't configured).
+    } catch { /* never block on a schedule-read failure — fail open */ }
+
+    if (windowBlocked) {
+      return res.status(403).json(windowBlocked);
     }
 
     // Resolve the linked student record. The user row stores the canonical

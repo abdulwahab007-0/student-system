@@ -36,6 +36,31 @@ function getTodayDayName() {
   return DAY_NAMES[new Date().getDay()];
 }
 
+// Parse a period's "HH:mm - HH:mm" range into { start, end } minutes-of-day.
+// Returns null when the range isn't parseable (callers fall back to allowing).
+function parseTimeRange(timeRange) {
+  const m = /(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/.exec(timeRange || '');
+  if (!m) return null;
+  const start = Number(m[1]) * 60 + Number(m[2]);
+  const end = Number(m[3]) * 60 + Number(m[4]);
+  if (Number.isNaN(start) || Number.isNaN(end)) return null;
+  return { start, end };
+}
+const nowMinutes = () => {
+  const d = new Date();
+  return d.getHours() * 60 + d.getMinutes();
+};
+// Overall time-window state for a given period's range, based on the current time.
+// Returns 'before' | 'during' | 'after' | null (null = undetermined, allow it).
+function periodWindowState(timeRange) {
+  const win = parseTimeRange(timeRange);
+  if (!win) return null;
+  const now = nowMinutes();
+  if (now < win.start) return 'before';
+  if (now > win.end) return 'after';
+  return 'during';
+}
+
 // Mark Attendance component (for students & CR)
 function MarkAttendance() {
   const { currentUser } = useAuth();
@@ -130,6 +155,17 @@ function MarkAttendance() {
   const handleMark = async () => {
     if (selectedPeriod == null) return showToast('Select a period first', 'error');
     if (!coords) return showToast('Get your location first', 'error');
+
+    // Enforce the lecture-time window in the UI too (server enforces as well).
+    const range = todayPeriods[selectedPeriod];
+    const state = periodWindowState(range);
+    if (state === 'before') {
+      return showToast('You cannot mark attendance before the lecture time', 'error');
+    }
+    if (state === 'after') {
+      return showToast('You cannot mark attendance after the lecture time', 'error');
+    }
+
     setMarking(true);
     try {
       const data = await api.markAttendance({
@@ -221,17 +257,26 @@ function MarkAttendance() {
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {todayPeriods.map((p, i) => {
                 const marked = alreadyMarked(i);
+                const winState = periodWindowState(p); // 'before' | 'during' | 'after' | null
+                const locked = marked || winState === 'before' || winState === 'after';
                 return (
                   <button
                     key={i}
+                    title={locked && !marked ? (winState === 'before' ? 'You cannot mark attendance before the lecture time' : winState === 'after' ? 'You cannot mark attendance after the lecture time' : '') : ''}
                     className={`btn ${selectedPeriod === i ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => !marked && setSelectedPeriod(i)}
-                    disabled={marked}
-                    style={{ opacity: marked ? 0.5 : 1, minWidth: '150px', justifyContent: 'center' }}
+                    onClick={() => !locked && setSelectedPeriod(i)}
+                    disabled={locked}
+                    style={{ opacity: locked ? 0.5 : 1, minWidth: '170px', justifyContent: 'center' }}
                   >
-                    <Icon name={marked ? 'check' : 'clock'} size={14} />
+                    <Icon name={marked ? 'check' : winState === 'after' ? 'x' : winState === 'before' ? 'clock' : 'clock'} size={14} />
                     <span><strong>{ORDINALS[i]}</strong> — {p}</span>
-                    {marked && <span className="badge badge-present" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Marked</span>}
+                    {marked
+                      ? <span className="badge badge-present" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Marked</span>
+                      : winState === 'after'
+                        ? <span className="badge badge-absent" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Absent</span>
+                        : winState === 'before'
+                          ? <span className="badge badge-warning" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Not open yet</span>
+                          : <span className="badge badge-success" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Open</span>}
                   </button>
                 );
               })}
@@ -262,6 +307,50 @@ function MarkAttendance() {
                 </select>
               </div>
             </div>
+
+            {(() => {
+              const range = todayPeriods[selectedPeriod];
+              const winStateSel = periodWindowState(range);
+              if (winStateSel === 'before') {
+                return (
+                  <div className="card" style={{ padding: '12px 16px', marginBottom: '14px', borderLeft: '4px solid var(--warning)', background: 'var(--warning-bg)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Icon name="clock" size={18} style={{ color: 'var(--warning)' }} />
+                      <div>
+                        <strong style={{ color: 'var(--warning)' }}>You cannot mark attendance before the lecture time</strong>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--gray)' }}>This period ({range}) has not begun yet. The mark will open at the lecture start time.</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              if (winStateSel === 'after') {
+                return (
+                  <div className="card" style={{ padding: '12px 16px', marginBottom: '14px', borderLeft: '4px solid var(--danger)', background: 'var(--danger-bg)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Icon name="x" size={18} style={{ color: 'var(--danger)' }} />
+                      <div>
+                        <strong style={{ color: 'var(--danger)' }}>You cannot mark attendance after the lecture time</strong>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--gray)' }}>This period ({range}) has ended — you are marked absent for it.</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              return winStateSel === 'during'
+                ? (
+                  <div className="card" style={{ padding: '12px 16px', marginBottom: '14px', borderLeft: '4px solid var(--success)', background: 'var(--success-bg)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Icon name="check" size={18} style={{ color: 'var(--success)' }} />
+                      <div>
+                        <strong style={{ color: 'var(--success)' }}>Lecture is in session ({range})</strong>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--gray)' }}>You can mark attendance now.</div>
+                      </div>
+                    </div>
+                  </div>
+                )
+                : null;
+            })()}
 
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '14px' }}>
               <button className="btn btn-primary" onClick={getLocation} disabled={locating}>
@@ -336,7 +425,7 @@ function MarkAttendance() {
             )}
 
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button className="btn btn-primary" onClick={handleMark} disabled={marking} style={{ minWidth: '140px', justifyContent: 'center' }}>
+              <button className="btn btn-primary" onClick={handleMark} disabled={marking || periodWindowState(todayPeriods[selectedPeriod]) === 'before' || periodWindowState(todayPeriods[selectedPeriod]) === 'after'} style={{ minWidth: '140px', justifyContent: 'center' }}>
                 <Icon name="check" size={16} /> {marking ? 'Submitting...' : 'Mark Attendance'}
               </button>
               <button className="btn btn-secondary" onClick={() => { setSelectedPeriod(null); setCoords(null); setResult(null); setSelectedSubject(''); }}>
