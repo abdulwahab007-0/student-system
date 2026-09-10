@@ -2081,6 +2081,267 @@ input, select, textarea {
   font-size: 0.95rem;
 }
 
+/* ── Marks accordion (semester scheme) ── */
+.scheme-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, var(--primary-bg), var(--secondary-bg));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+.scheme-legend-title {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--dark);
+  margin-right: 4px;
+}
+.scheme-legend-chip {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--primary-dark);
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.scheme-legend-max {
+  color: var(--gray);
+  font-weight: 500;
+}
+.scheme-legend-total {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--secondary);
+  white-space: nowrap;
+}
+
+.mark-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mark-accordion-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--white);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.mark-accordion-item.open {
+  border-color: rgba(124, 58, 237, 0.35);
+  box-shadow: var(--shadow-md);
+}
+.mark-accordion-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s ease;
+}
+.mark-accordion-head:hover {
+  background: var(--light-gray);
+}
+.accordion-avatar {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: #fff;
+  background: var(--gradient-primary);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
+}
+.accordion-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.accordion-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--dark);
+}
+.accordion-sub {
+  font-size: 0.78rem;
+  color: var(--gray);
+}
+.accordion-avg-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.mark-accordion-body {
+  border-top: 1px solid var(--border);
+  background: var(--light-gray);
+  padding: 12px;
+}
+.scheme-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 700px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.scheme-table th {
+  padding: 8px 10px;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+}
+.scheme-table th.col-subject {
+  width: 180px;
+  text-align: left;
+}
+.scheme-table .col-sessional {
+  background: linear-gradient(135deg, #fdf2ec, #e0eefd);
+  color: #9a3412;
+}
+.scheme-table .col-mid {
+  background: linear-gradient(135deg, #eff6ff, #e0e7ff);
+  color: #1d4ed8;
+}
+.scheme-table .col-final {
+  background: linear-gradient(135deg, #fdf4ff, #fce7f3);
+  color: #86198f;
+}
+.scheme-table th.col-total,
+.scheme-table th.col-grade {
+  background: #f8fafc;
+}
+.scheme-table .scheme-sub {
+  font-size: 0.72rem;
+  letter-spacing: 0.3px;
+}
+.scheme-table .max-tag {
+  font-weight: 500;
+  opacity: 0.75;
+  margin-left: 2px;
+}
+.scheme-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+  vertical-align: middle;
+}
+.scheme-table tr:last-child td {
+  border-bottom: none;
+}
+.scheme-table .col-subject {
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--dark);
+}
+.scheme-row:hover td {
+  background: #f8fafc;
+}
+.subject-rename-input {
+  width: 100%;
+  max-width: 160px;
+  padding: 5px 8px;
+  border: 1px dashed var(--primary);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--primary-dark);
+  background: var(--primary-bg);
+}
+.scheme-input {
+  width: 60px;
+  padding: 6px 4px;
+  text-align: center;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--dark);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--white);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.scheme-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+}
+.scheme-input.has-value {
+  border-color: rgba(124, 58, 237, 0.4);
+  background: var(--primary-bg);
+}
+.scheme-input.invalid {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.scheme-readonly {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--dark);
+}
+.scheme-total {
+  font-weight: 800;
+  font-size: 0.92rem;
+}
+.scheme-total-max {
+  font-size: 0.68rem;
+  color: var(--gray);
+  margin-left: 2px;
+}
+.scheme-empty {
+  text-align: center;
+  color: var(--gray);
+  font-size: 0.85rem;
+  padding: 22px 10px !important;
+}
+.scheme-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.scheme-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.scheme-footer-hint {
+  font-size: 0.74rem;
+  color: var(--gray);
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  white-space: nowrap;
+}
+
 /* ═════════════════════════════════════════════════════════════
    Auth Pages — Gratafy-style abstract login (light + dark)
    ═════════════════════════════════════════════════════════════ */

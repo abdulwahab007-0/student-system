@@ -534,38 +534,45 @@ function seedClassSchedules() {
     });
 }
 function seedMarks(iM) {
-    [
-        [1, "Ahmed Khan", "Mathematics", 92, "A+", "Final"],
-        [1, "Ahmed Khan", "Physics", 88, "A", "Final"],
-        [1, "Ahmed Khan", "Chemistry", 95, "A+", "Final"],
-        [2, "Priya Sharma", "Mathematics", 90, "A+", "Final"],
-        [2, "Priya Sharma", "Physics", 85, "A", "Final"],
-        [2, "Priya Sharma", "Chemistry", 92, "A+", "Final"],
-        [3, "Rahul Verma", "Mathematics", 85, "A", "Final"],
-        [3, "Rahul Verma", "Physics", 78, "B+", "Final"],
-        [3, "Rahul Verma", "Chemistry", 80, "A-", "Final"],
-        [4, "Sneha Patel", "Mathematics", 88, "A", "Final"],
-        [4, "Sneha Patel", "Physics", 82, "A-", "Final"],
-        [4, "Sneha Patel", "Chemistry", 86, "A", "Final"],
-        [5, "Arjun Singh", "Biology", 91, "A+", "Midterm"],
-        [5, "Arjun Singh", "English", 84, "A", "Midterm"],
-        [5, "Arjun Singh", "Computer Science", 90, "A+", "Midterm"],
-        [6, "Fatima Sheikh", "Biology", 93, "A+", "Midterm"],
-        [6, "Fatima Sheikh", "English", 87, "A", "Midterm"],
-        [6, "Fatima Sheikh", "Computer Science", 94, "A+", "Midterm"],
-        [7, "Vikram Mehta", "Biology", 72, "B", "Midterm"],
-        [7, "Vikram Mehta", "English", 75, "B+", "Midterm"],
-        [7, "Vikram Mehta", "Computer Science", 68, "B-", "Midterm"],
-        [8, "Ananya Gupta", "Mathematics", 89, "A", "Final"],
-        [8, "Ananya Gupta", "Physics", 93, "A+", "Final"],
-        [8, "Ananya Gupta", "Chemistry", 87, "A", "Final"],
-        [9, "Rohan Joshi", "Mathematics", 76, "B+", "Final"],
-        [9, "Rohan Joshi", "Physics", 70, "B", "Final"],
-        [9, "Rohan Joshi", "Chemistry", 74, "B+", "Final"],
-        [10, "Kavya Nair", "Biology", 86, "A", "Midterm"],
-        [10, "Kavya Nair", "English", 92, "A+", "Midterm"],
-        [10, "Kavya Nair", "Computer Science", 83, "A-", "Midterm"],
-    ].forEach(r => iM.run(...r));
+    // Semester scheme: Assignment(10) + Attendance(5) + Quiz(15) + Mid(30) + Final(40) = 100
+    const subjectsFor = {
+        1: ["Mathematics", "Physics", "Chemistry"],
+        2: ["Mathematics", "Physics", "Chemistry"],
+        3: ["Mathematics", "Physics", "Chemistry"],
+        4: ["Mathematics", "Physics", "Chemistry"],
+        5: ["Biology", "English", "Computer Science"],
+        6: ["Biology", "English", "Computer Science"],
+        7: ["Biology", "English", "Computer Science"],
+        8: ["Mathematics", "Physics", "Chemistry"],
+        9: ["Mathematics", "Physics", "Chemistry"],
+        10: ["Biology", "English", "Computer Science"],
+    };
+    const names = {
+        1: "Ahmed Khan", 2: "Priya Sharma", 3: "Rahul Verma", 4: "Sneha Patel",
+        5: "Arjun Singh", 6: "Fatima Sheikh", 7: "Vikram Mehta", 8: "Ananya Gupta",
+        9: "Rohan Joshi", 10: "Kavya Nair",
+    };
+    // Value profiles per student: [assign, attendance, quiz, mid, final]
+    const profiles = {
+        1: [9, 5, 13, 27, 37], 2: [8, 5, 14, 26, 38], 3: [7, 4, 12, 22, 33],
+        4: [8, 4, 13, 25, 36], 5: [9, 5, 13, 26, 37], 6: [9, 5, 14, 27, 39],
+        7: [6, 4, 11, 21, 30], 8: [9, 5, 13, 28, 38], 9: [7, 4, 11, 21, 32],
+        10: [8, 5, 12, 25, 36],
+    };
+    const gradeOf = t => (t >= 90 ? 'A+' : t >= 85 ? 'A' : t >= 80 ? 'A-' : t >= 75 ? 'B+' : t >= 70 ? 'B' : t >= 65 ? 'B-' : t >= 60 ? 'C+' : t >= 50 ? 'C' : t >= 40 ? 'D' : 'F');
+    const comps = [
+        ["Assignment", 0], ["Attendance", 1], ["Quiz", 2], ["Mid", 3], ["Final", 4],
+    ];
+    Object.keys(subjectsFor).forEach(sid => {
+        const id = Number(sid);
+        const p = profiles[id];
+        subjectsFor[id].forEach(sub => {
+            const total = p[0] + p[1] + p[2] + p[3] + p[4];
+            comps.forEach(([type, idx]) => {
+                iM.run(id, names[id], sub, p[idx], type === 'Final' ? gradeOf(total) : '', type);
+            });
+        });
+    });
 }
 
 export function seedDatabase() {
