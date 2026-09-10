@@ -88,6 +88,16 @@ function Dashboard() {
     .sort((a, b) => b.average - a.average)
     .slice(0, 8);
 
+  // Student count per class
+  const classCounts = {};
+  visibleStudents.forEach(s => {
+    const cls = s.className || 'Unclassified';
+    classCounts[cls] = (classCounts[cls] || 0) + 1;
+  });
+  const classCountsList = Object.entries(classCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, count], i) => ({ name, count, color: avatarColors[i % avatarColors.length] }));
+
   // Gender ratio for admin chart
   const maleCount = visibleStudents.filter(s => (s.gender || '').toLowerCase() === 'male').length;
   const femaleCount = visibleStudents.filter(s => (s.gender || '').toLowerCase() === 'female').length;
@@ -412,6 +422,65 @@ function Dashboard() {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Students Per Class Chart */}
+          {classCountsList.length > 0 && (
+            <div className="panel" style={{ marginBottom: '24px' }}>
+              <div className="panel-header">
+                <h3>🏫 Students Per Class</h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--gray)' }}>
+                  {classCountsList.length} class{classCountsList.length !== 1 ? 'es' : ''} · {totalStudents} total students
+                </span>
+              </div>
+              <div className="panel-body" style={{ padding: '20px 24px' }}>
+                {(() => {
+                  const maxCount = Math.max(...classCountsList.map(c => c.count), 1);
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '180px', padding: '0 8px' }}>
+                      {classCountsList.map((cls, i) => {
+                        const barHeight = Math.max((cls.count / maxCount) * 140, 8);
+                        const pct = totalStudents > 0 ? ((cls.count / totalStudents) * 100).toFixed(0) : 0;
+                        return (
+                          <div key={cls.name} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--dark)' }}>
+                              {cls.count}
+                            </span>
+                            <div style={{
+                              width: '100%',
+                              maxWidth: '48px',
+                              height: `${barHeight}px`,
+                              background: cls.color,
+                              borderRadius: '6px 6px 2px 2px',
+                              transition: 'height 0.4s ease',
+                              cursor: 'pointer',
+                              position: 'relative',
+                            }}
+                              title={`${cls.name}: ${cls.count} students (${pct}%)`}
+                            />
+                            <span style={{
+                              fontSize: '0.72rem',
+                              fontWeight: '600',
+                              color: 'var(--dark)',
+                              textAlign: 'center',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: '64px',
+                            }}>
+                              {cls.name}
+                            </span>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--gray)' }}>
+                              {pct}%
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
