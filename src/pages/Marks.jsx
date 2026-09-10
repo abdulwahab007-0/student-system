@@ -35,6 +35,13 @@ function numOrZero(v) {
   return isNaN(n) ? 0 : n;
 }
 
+/** Match a subject's comma-separated className list to a student's class. */
+function subjectMatchesClass(subject, studentClass) {
+  if (!studentClass) return false;
+  const tags = (subject.className || '').split(',').map(c => c.trim().toLowerCase());
+  return tags.includes(String(studentClass).trim().toLowerCase());
+}
+
 // Main
 function Marks() {
   const { students, marks, subjects, addMarks, updateMarks, deleteMark } = useData();
@@ -46,6 +53,7 @@ function Marks() {
   const [drafts, setDrafts] = useState({});
   const [savingId, setSavingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [subjectPickerStudentId, setSubjectPickerStudentId] = useState(null);
 
   const canEdit = hasPermission('record_marks') || hasPermission('delete_marks');
   const role = currentUser?.role;
@@ -137,7 +145,42 @@ function Marks() {
     });
   };
 
+  /** Get class-appropriate subjects for a student (not already in draft). */
+  const getClassSubjects = useCallback((studentId) => {
+    const student = students.find(s => s.id === studentId);
+    if (!student) return [];
+    const draft = drafts[studentId];
+    const existingNames = new Set(draft?.order || []);
+    return subjects.filter(s =>
+      subjectMatchesClass(s, student.className) && !existingNames.has(s.name)
+    );
+  }, [students, subjects, drafts]);
+
   const handleAddSubject = (studentId) => {
+    setSubjectPickerStudentId(studentId);
+  };
+
+  const handlePickSubject = (studentId, subjectName) => {
+    setSubjectPickerStudentId(null);
+    if (!subjectName) return;
+    setDrafts(prev => {
+      const draft = prev[studentId];
+      if (!draft) return prev;
+      if (draft.cells[subjectName]) return prev; // already exists
+      return {
+        ...prev,
+        [studentId]: {
+          ...draft,
+          order: [...draft.order, subjectName],
+          cells: { ...draft.cells, [subjectName]: emptyCells() },
+          newSubjects: { ...(draft.newSubjects || {}), [subjectName]: true },
+        },
+      };
+    });
+  };
+
+  const handleAddCustomSubject = (studentId) => {
+    setSubjectPickerStudentId(null);
     setDrafts(prev => {
       const draft = prev[studentId];
       if (!draft) return prev;
@@ -445,16 +488,15 @@ function Marks() {
                                     {canEdit ? (
                                       <input
                                         className={'scheme-input' + (invalid ? ' invalid' : '') + (raw !== '' ? ' has-value' : '')}
-                                        type="number"
-                                        min="0"
-                                        max={comp.max}
+                                        type="text"
+                                        inputMode="decimal"
                                         value={raw}
                                         placeholder={'\u2014'}
                                         onChange={(e) => handleCellChange(student.id, subject, comp.key, e.target.value)}
                                       />
                                     ) : (
                                       <span className="scheme-readonly">
-                                        {raw !== '' ? num : '\u2014'}
+                                        {raw !== '' ? numOrZero(raw) : '\u2014'}
                                       </span>
                                     )}
                                   </td>
@@ -558,6 +600,55 @@ function Marks() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
+
+      {/* Subject picker dropdown */}
+      {subjectPickerStudentId && (() => {
+        const pickerStudent = students.find(s => s.id === subjectPickerStudentId);
+        const classSubjects = getClassSubjects(subjectPickerStudentId);
+        const studentClass = pickerStudent?.className || '';
+        return (
+          <div className="subject-picker-overlay" onClick={() => setSubjectPickerStudentId(null)}>
+            <div className="subject-picker-panel" onClick={(e) => e.stopPropagation()}>
+              <div className="subject-picker-header">
+                <h3>Add Subject{pickerStudent ? ' — ' + pickerStudent.name : ''}</h3>
+                <span className="subject-picker-class-tag">{studentClass}</span>
+                <button className="subject-picker-close" onClick={() => setSubjectPickerStudentId(null)}>
+                  <Icon name="delete" size={16} />
+                </button>
+              </div>
+
+              {classSubjects.length > 0 ? (
+                <div className="subject-picker-list">
+                  {classSubjects.map(s => (
+                    <button
+                      key={s.id || s.name}
+                      className="subject-picker-item"
+                      onClick={() => handlePickSubject(subjectPickerStudentId, s.name)}
+                    >
+                      <span className="subject-picker-name">{s.name}</span>
+                      <span className="subject-picker-code">{s.code}</span>
+                      {s.teacher && <span className="subject-picker-teacher">{s.teacher}</span>}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="subject-picker-empty">
+                  No additional subjects configured for class <strong>{studentClass}</strong>.
+                </div>
+              )}
+
+              <div className="subject-picker-footer">
+                <button
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => handleAddCustomSubject(subjectPickerStudentId)}
+                >
+                  <Icon name="plus" size={14} style={{ marginRight: '4px' }} /> Add Custom Subject
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
