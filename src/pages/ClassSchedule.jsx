@@ -466,6 +466,50 @@ function ClassSchedule() {
                 ))}
               </tbody>
             </table>
+
+            {/* Mobile mobile-friendly day-card view (hidden on desktop) */}
+            <div className="schedule-mobile-cards">
+              {days.map((day, di) => (
+                <div key={`${day.name}_${di}`} className="schedule-day-card" style={{ '--accent': dayColors[di % dayColors.length] }}>
+                  <div className="schedule-day-card-header">
+                    <Icon name="calendar" size={14} />
+                    <span>{day.name}</span>
+                    <span className="schedule-day-card-count">{day.periods.length} period{day.periods.length === 1 ? '' : 's'}</span>
+                  </div>
+                  {day.periods.map((timeLabel, pi) => {
+                    const slot = getSlot(day.name, pi);
+                    const color = slotColors[pi % slotColors.length];
+                    return (
+                      <div key={`${day.name}_${pi}`} className="schedule-day-period">
+                        <div className="schedule-day-period-time" style={{ color }}>{to12Hour(timeLabel)}</div>
+                        {slot ? (
+                          <div className="schedule-cell-card" style={{ '--accent': color, cursor: canManage ? 'pointer' : 'default' }} onClick={() => canManage && openAddSlot(day.name, pi)}>
+                            <div className="schedule-cell-subject">{slot.subject}</div>
+                            {slot.teacher && <div className="schedule-cell-teacher">{slot.teacher}</div>}
+                            {slot.room && <div className="schedule-cell-room" style={{ color }}>{slot.room}</div>}
+                            {canManage && (
+                              <div className="schedule-cell-actions">
+                                <button className="btn-icon edit" title="Edit" onClick={(e) => { e.stopPropagation(); openAddSlot(day.name, pi); }}><Icon name="edit" size={12} /></button>
+                                <button className="btn-icon delete" title="Delete" onClick={(e) => { e.stopPropagation(); setDeletingSlot({ day: day.name, timeIndex: pi }); }}><Icon name="delete" size={12} /></button>
+                              </div>
+                            )}
+                          </div>
+                        ) : canManage ? (
+                          <button className="schedule-cell-add" onClick={() => openAddSlot(day.name, pi)}>
+                            <Icon name="plus" size={14} /> Add
+                          </button>
+                        ) : (
+                          <div className="schedule-cell-empty">No class</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {day.periods.length === 0 && (
+                    <div className="schedule-day-empty">No periods configured</div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
