@@ -5,6 +5,20 @@ import { getStudentAverage } from '../utils/scoreUtils';
 
 const avatarColors = ['#059669', '#0284c7', '#16a34a', '#d97706', '#7c3aed', '#dc2626', '#db2777', '#0ea5e9', '#ea580c', '#047857'];
 
+// Vibrant gradient pairs (from -> to) for modern gradient charts
+const chartGradients = [
+  { from: '#8b5cf6', to: '#6d28d9' }, // violet
+  { from: '#ec4899', to: '#be185d' }, // pink
+  { from: '#f97316', to: '#c2410c' }, // orange
+  { from: '#06b6d4', to: '#0e7490' }, // cyan
+  { from: '#10b981', to: '#047857' }, // emerald
+  { from: '#3b82f6', to: '#1d4ed8' }, // blue
+  { from: '#f59e0b', to: '#b45309' }, // amber
+  { from: '#ef4444', to: '#b91c1c' }, // red
+  { from: '#14b8a6', to: '#0f766e' }, // teal
+  { from: '#a855f7', to: '#7e22ce' }, // fuchsia
+];
+
 function getInitials(name) {
   return name
     ? name.split(' ').map(word => word[0]).slice(0, 2).join('').toUpperCase()
@@ -310,7 +324,17 @@ function Dashboard() {
                 padding: '28px 24px',
                 flexWrap: 'wrap',
               }}>
-                <svg width="150" height="150" viewBox="0 0 150 150">
+                <svg width="160" height="160" viewBox="0 0 160 160">
+                  <defs>
+                    <linearGradient id="gradMale" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#818cf8" />
+                      <stop offset="100%" stopColor="#4f46e5" />
+                    </linearGradient>
+                    <linearGradient id="gradFemale" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#f472b6" />
+                      <stop offset="100%" stopColor="#db2777" />
+                    </linearGradient>
+                  </defs>
                   {(() => {
                     const R = 56;
                     const C = 2 * Math.PI * R;
@@ -318,31 +342,33 @@ function Dashboard() {
                     const femaleArc = (femalePct / 100) * C;
                     return (
                       <>
-                        <circle cx="75" cy="75" r={R} fill="none" stroke="var(--border)" strokeWidth="16" />
+                        <circle cx="80" cy="80" r={R} fill="none" stroke="var(--border)" strokeWidth="18" />
                         {malePct > 0 && (
-                          <circle cx="75" cy="75" r={R} fill="none"
-                            stroke="#6366f1" strokeWidth="16"
+                          <circle cx="80" cy="80" r={R} fill="none"
+                            stroke="url(#gradMale)" strokeWidth="18"
                             strokeDasharray={`${maleArc} ${C}`}
                             strokeLinecap="round"
-                            transform="rotate(-90 75 75)" />
+                            transform="rotate(-90 80 80)"
+                            style={{ filter: 'drop-shadow(0 2px 4px rgba(79,70,229,0.35))' }} />
                         )}
                         {femalePct > 0 && (
-                          <circle cx="75" cy="75" r={R} fill="none"
-                            stroke="#ec4899" strokeWidth="16"
+                          <circle cx="80" cy="80" r={R} fill="none"
+                            stroke="url(#gradFemale)" strokeWidth="18"
                             strokeDasharray={`${femaleArc} ${C}`}
                             strokeDashoffset={`${-maleArc}`}
                             strokeLinecap="round"
-                            transform="rotate(-90 75 75)" />
+                            transform="rotate(-90 80 80)"
+                            style={{ filter: 'drop-shadow(0 2px 4px rgba(219,39,119,0.35))' }} />
                         )}
-                        <text x="75" y="71" textAnchor="middle" fontSize="24" fontWeight="700" fill="var(--dark)">{totalWithGender}</text>
-                        <text x="75" y="88" textAnchor="middle" fontSize="10" fill="var(--gray)">students</text>
+                        <text x="80" y="77" textAnchor="middle" fontSize="26" fontWeight="800" fill="var(--dark)">{totalWithGender}</text>
+                        <text x="80" y="95" textAnchor="middle" fontSize="11" fill="var(--gray)">students</text>
                       </>
                     );
                   })()}
                 </svg>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '14px', height: '14px', borderRadius: '4px', background: '#6366f1', flexShrink: 0 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 14px', borderRadius: '10px', background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(79,70,229,0.15))', border: '1px solid rgba(99,102,241,0.15)' }}>
+                    <div style={{ width: '14px', height: '14px', borderRadius: '4px', background: 'linear-gradient(135deg, #818cf8, #4f46e5)', flexShrink: 0 }} />
                     <div>
                       <span style={{ fontSize: '0.92rem', fontWeight: '600', color: 'var(--dark)' }}>Male</span>
                       <span style={{ fontSize: '0.85rem', color: 'var(--gray)', marginLeft: '8px' }}>
@@ -350,8 +376,8 @@ function Dashboard() {
                       </span>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '14px', height: '14px', borderRadius: '4px', background: '#ec4899', flexShrink: 0 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 14px', borderRadius: '10px', background: 'linear-gradient(135deg, rgba(236,72,153,0.08), rgba(219,39,119,0.15))', border: '1px solid rgba(236,72,153,0.15)' }}>
+                    <div style={{ width: '14px', height: '14px', borderRadius: '4px', background: 'linear-gradient(135deg, #f472b6, #db2777)', flexShrink: 0 }} />
                     <div>
                       <span style={{ fontSize: '0.92rem', fontWeight: '600', color: 'var(--dark)' }}>Female</span>
                       <span style={{ fontSize: '0.85rem', color: 'var(--gray)', marginLeft: '8px' }}>
@@ -378,34 +404,55 @@ function Dashboard() {
                 </div>
                 <div className="panel-body" style={{ padding: '16px 24px' }}>
                   {rankedStudents.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {rankedStudents.map((student, i) => {
-                        const barColors = ['#f59e0b', '#94a3b8', '#d97706', '#6366f1', '#06b6d4', '#10b981', '#8b5cf6', '#ec4899'];
-                        const color = barColors[i % barColors.length];
+                        const grad = chartGradients[i % chartGradients.length];
                         const medalLabels = ['🥇', '🥈', '🥉'];
+                        const medalGrads = [
+                          'linear-gradient(135deg, #fde047, #f59e0b)',
+                          'linear-gradient(135deg, #e2e8f0, #94a3b8)',
+                          'linear-gradient(135deg, #fdba74, #c2410c)',
+                        ];
                         return (
-                          <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontSize: '0.82rem', color: 'var(--gray)', width: '28px', textAlign: 'right', flexShrink: 0 }}>
-                              {i < 3 ? medalLabels[i] : `#${i + 1}`}
+                          <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{
+                              width: '32px', height: '32px', borderRadius: '10px', flexShrink: 0,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: '0.95rem', fontWeight: '800',
+                              background: i < 3
+                                ? medalGrads[i]
+                                : 'linear-gradient(135deg, var(--primary-bg), var(--secondary-bg))',
+                              color: i < 3 ? '#78350f' : 'var(--primary)',
+                              boxShadow: '0 3px 8px rgba(0,0,0,0.10)',
+                            }}>
+                              {i < 3 ? medalLabels[i] : i + 1}
                             </span>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--dark)', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--dark)', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {student.name}
                                 <span style={{ fontWeight: '400', color: 'var(--gray)', fontSize: '0.72rem', marginLeft: '6px' }}>
                                   {student.className}
                                 </span>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div style={{ flex: 1, height: '10px', background: 'var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
+                                <div style={{ flex: 1, height: '12px', background: 'var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
                                   <div style={{
                                     height: '100%',
                                     width: `${student.average}%`,
-                                    background: color,
-                                    borderRadius: '6px',
-                                    transition: 'width 0.4s ease',
+                                    background: `linear-gradient(90deg, ${grad.from}, ${grad.to})`,
+                                    borderRadius: '8px',
+                                    transition: 'width 0.5s ease',
+                                    boxShadow: `0 2px 6px -1px ${grad.to}66`,
                                   }} />
                                 </div>
-                                <span style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--dark)', minWidth: '40px', textAlign: 'right' }}>
+                                <span style={{
+                                  fontSize: '0.82rem', fontWeight: '800', minWidth: '44px', textAlign: 'right',
+                                  color: grad.to,
+                                  background: '#fff',
+                                  border: `1px solid ${grad.to}33`,
+                                  borderRadius: '7px',
+                                  padding: '1px 7px',
+                                }}>
                                   {student.average}%
                                 </span>
                               </div>
@@ -439,36 +486,47 @@ function Dashboard() {
                 {(() => {
                   const maxCount = Math.max(...classCountsList.map(c => c.count), 1);
                   return (
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '180px', padding: '0 8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '14px', height: '220px', padding: '0 12px', position: 'relative' }}>
+                      {/* dashed baseline */}
+                      <div style={{ position: 'absolute', left: '12px', right: '12px', bottom: '46px', borderTop: '1px dashed var(--border)' }} />
                       {classCountsList.map((cls, i) => {
-                        const barHeight = Math.max((cls.count / maxCount) * 140, 8);
+                        const grad = chartGradients[i % chartGradients.length];
+                        const barHeight = Math.max((cls.count / maxCount) * 150, 10);
                         const pct = totalStudents > 0 ? ((cls.count / totalStudents) * 100).toFixed(0) : 0;
                         return (
                           <div key={cls.name} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                            <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--dark)' }}>
+                            <span style={{
+                              fontSize: '0.8rem', fontWeight: '800', color: grad.to,
+                              background: 'linear-gradient(135deg, var(--primary-bg), var(--secondary-bg))',
+                              borderRadius: '8px', padding: '1px 9px',
+                            }}>
                               {cls.count}
                             </span>
                             <div style={{
                               width: '100%',
-                              maxWidth: '48px',
+                              maxWidth: '52px',
                               height: `${barHeight}px`,
-                              background: cls.color,
-                              borderRadius: '6px 6px 2px 2px',
-                              transition: 'height 0.4s ease',
+                              background: `linear-gradient(180deg, ${grad.from}, ${grad.to})`,
+                              borderRadius: '10px 10px 4px 4px',
+                              boxShadow: `0 8px 16px -6px ${grad.to}88`,
+                              transition: 'height 0.4s ease, transform 0.2s ease',
                               cursor: 'pointer',
                               position: 'relative',
                             }}
                               title={`${cls.name}: ${cls.count} students (${pct}%)`}
-                            />
+                              onMouseEnter={e => { e.currentTarget.style.transform = 'scaleX(1.06)'; }}
+                              onMouseLeave={e => { e.currentTarget.style.transform = 'scaleX(1)'; }}
+                            >
+                              {/* glass shine effect */}
+                              <div style={{
+                                position: 'absolute', top: '4px', left: '6px', right: '6px',
+                                height: '32%', borderRadius: '8px',
+                                background: 'linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0))',
+                              }} />
+                            </div>
                             <span style={{
-                              fontSize: '0.72rem',
-                              fontWeight: '600',
-                              color: 'var(--dark)',
-                              textAlign: 'center',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              maxWidth: '64px',
+                              fontSize: '0.72rem', fontWeight: '600', color: 'var(--dark)',
+                              textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '64px',
                             }}>
                               {cls.name}
                             </span>
