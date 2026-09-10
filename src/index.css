@@ -3564,6 +3564,11 @@ input, select, textarea {
     display: block;
     padding: 8px 0;
   }
+
+  /* ── ID card grid ── */
+  .id-card-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 /* ===== Dark Mode: hardcoded-color overrides ===== */
@@ -4962,14 +4967,17 @@ footer {
   .data-table thead th { padding: 10px 10px; font-size: 0.72rem; }
   .data-table tbody td { padding: 10px 10px; font-size: 0.78rem; }
   /* Only panel-body wrappers that actually contain a table get scroll (safe: no dropdown clipping) */
-  .panel-body:has(.data-table) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .panel-body:has(.data-table),
+  .panel-body:has(.scheme-table) {
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+  }
 
   /* ── Toolbar & Filters ── */
   .filter-select { width: 100%; min-width: 0; }
   .toolbar .btn-add, .toolbar .btn-secondary { width: 100%; justify-content: center; }
 
   /* ── Card grid → adaptive columns, compact on tablet ── */
-  .card-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+  .card-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important; gap: 14px !important; }
 
   /* ── Detail grid → single column ── */
   .detail-grid { grid-template-columns: 1fr; gap: 12px; }
@@ -4979,7 +4987,14 @@ footer {
 
   /* ── Approval items ── */
   .approval-item { padding: 14px 16px; flex-direction: column; align-items: flex-start; }
-  .approval-actions { width: 100%; justify-content: flex-end; }
+  .approval-user { min-width: 0; }
+  .approval-user > div:last-child { min-width: 0; overflow: hidden; }
+  .approval-actions { width: 100%; border-top: 1px solid var(--border); padding-top: 10px; justify-content: flex-end; }
+
+  /* ── My card layout: stack on mobile ── */
+  .my-card-layout { flex-direction: column; gap: 14px; }
+  .my-card-side { max-width: 100%; width: 100%; }
+  .my-card-panel .panel-header { flex-direction: column; align-items: flex-start; gap: 8px; }
 
   /* ── Todo page ── */
   .todo-search-input { width: 100% !important; }
@@ -5078,5 +5093,11 @@ footer {
 
   /* Search input */
   .search-input { width: 100%; }
+
+  /* Dashboard chart row — beat inline minmax(340px) on narrow screens */
+  .charts-row {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
 }
 

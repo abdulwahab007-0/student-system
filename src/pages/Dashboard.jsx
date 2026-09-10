@@ -302,12 +302,15 @@ function Dashboard() {
 
           {/* Charts Row: Gender Distribution + Student Ranking */}
           {totalStudents > 0 && (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-              gap: '20px',
-              marginBottom: '24px',
-            }}>
+            <div
+              className="charts-row"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+                gap: '20px',
+                marginBottom: '24px',
+              }}
+            >
               {/* Gender Distribution Chart */}
               <div className="panel">
                 <div className="panel-header">
