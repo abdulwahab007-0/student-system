@@ -20,10 +20,15 @@ const DEFAULT_PERIOD = '8:00 AM - 9:30 AM';
 // ── 12-hour time formatter ───────────────────────────────────────────────
 // Converts 24h time strings like "08:00 - 09:30" → "8:00 AM - 9:30 AM"
 // Passes through already-12h or non-parseable strings unchanged.
+// Also fixes corrupted AMAM/PMAM patterns from earlier bugs.
 const to12Hour = (label) => {
   if (!label || typeof label !== 'string') return label;
+  // First, fix any corrupted AM/PM patterns (AM AM → AM, AMAM → AM, PMPM → PM, etc.)
+  let fixed = label.replace(/\bAM(?:\s*AM)+\b/gi, 'AM').replace(/\bPM(?:\s*PM)+\b/gi, 'PM');
+  // Already in 12h format with correct AM/PM — return as-is
+  if (/\b(AM|PM)\b/i.test(fixed)) return fixed;
   // Match patterns like "08:00 - 09:30" or "8:00-9:30" or "08:00 to 09:30"
-  return label.replace(/(\d{1,2}):(\d{2})\s*(?:[-–—to]+\s*(\d{1,2}):(\d{2}))?/gi, (_, h1, m1, h2, m2) => {
+  return fixed.replace(/(\d{1,2}):(\d{2})\s*(?:[-–—to]+\s*(\d{1,2}):(\d{2}))?/gi, (_, h1, m1, h2, m2) => {
     const fmt = (h, m) => {
       const hour = parseInt(h, 10);
       const ampm = hour >= 12 ? 'PM' : 'AM';
@@ -408,9 +413,12 @@ function ClassSchedule() {
                 <tr>
                   <th className="schedule-th schedule-th-day">Day</th>
                   {Array.from({ length: maxPeriods(structure) || 1 }, (_, pi) => {
-                    // Find the first day that has this period index, to show its time in header
-                    const firstDayWithPeriod = days.find(d => d.periods.length > pi);
-                    const headerTime = firstDayWithPeriod ? to12Hour(firstDayWithPeriod.periods[pi]) : '';
+                    // Only show a single time in the column header when ALL days
+                    // with this period share the same time. If days differ, each
+                    // cell shows its own time below.
+                    const withPeriod = days.filter(d => d.periods.length > pi);
+                    const times = Array.from(new Set(withPeriod.map(d => to12Hour(d.periods[pi]))));
+                    const headerTime = withPeriod.length > 0 && times.length === 1 ? times[0] : '';
                     return (
                       <th key={pi} className="schedule-th" style={{ '--accent': slotColors[pi % slotColors.length] }}>
                         <div className="schedule-th-ordinal">{ordinalLabel(pi)} Period</div>
