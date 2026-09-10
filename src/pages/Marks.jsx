@@ -4,28 +4,25 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import {
-  EXAM_SCHEME, SCHEME_KEYS, SCHEME_TOTAL,
+  getExamScheme, getSchemeTotal, getSchemeKeys,
+  getGradeThresholds, setExamScheme, setGradeThresholds, resetExamDefaults,
   normalizeExamType, getStudentAverage
 } from '../utils/scoreUtils';
 import Icon from '../components/Icon';
 
 // Helpers
+/** Grade from configurable thresholds (reads fresh each time). */
 function getGrade(marks) {
-  if (marks >= 90) return { grade: 'A+', color: 'var(--success)' };
-  if (marks >= 85) return { grade: 'A', color: 'var(--success)' };
-  if (marks >= 80) return { grade: 'A-', color: 'var(--success)' };
-  if (marks >= 75) return { grade: 'B+', color: 'var(--warning)' };
-  if (marks >= 70) return { grade: 'B', color: 'var(--warning)' };
-  if (marks >= 65) return { grade: 'B-', color: 'var(--warning)' };
-  if (marks >= 60) return { grade: 'C+', color: 'var(--warning)' };
-  if (marks >= 50) return { grade: 'C', color: 'var(--danger)' };
-  if (marks >= 40) return { grade: 'D', color: 'var(--danger)' };
+  const thresholds = getGradeThresholds();
+  for (const t of thresholds) {
+    if (marks >= t.min) return { grade: t.grade, color: 'var(--success)' };
+  }
   return { grade: 'F', color: 'var(--danger)' };
 }
 
 function emptyCells() {
   const c = {};
-  EXAM_SCHEME.forEach(e => { c[e.key] = { value: '', id: null }; });
+  getExamScheme().forEach(e => { c[e.key] = { value: '', id: null }; });
   return c;
 }
 
@@ -54,6 +51,23 @@ function Marks() {
   const [savingId, setSavingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [subjectPickerStudentId, setSubjectPickerStudentId] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsVersion, setSettingsVersion] = useState(0);
+
+  // Read current scheme from getters (fresh from localStorage each render)
+  const examScheme = getExamScheme();
+  const schemeTotal = getSchemeTotal();
+  const schemeKeys = getSchemeKeys();
+
+  // Clear all drafts when settings change so tables use the new scheme shape
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useMemo(() => {
+    if (settingsVersion > 0) {
+      setDrafts({});
+      setExpandedId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsVersion]);
 
   const canEdit = hasPermission('record_marks') || hasPermission('delete_marks');
   const role = currentUser?.role;
@@ -116,7 +130,7 @@ function Marks() {
     const order = [];
     list.forEach(m => {
       const key = normalizeExamType(m.examType);
-      if (!SCHEME_KEYS.has(key)) return;
+      if (!schemeKeys.has(key)) return;
       if (!cells[m.subject]) { cells[m.subject] = emptyCells(); order.push(m.subject); }
       const cell = cells[m.subject][key];
       if (cell && cell.id == null) {
@@ -246,7 +260,7 @@ function Marks() {
 
     // Validate all cells
     for (const [subject, cells] of Object.entries(draft.cells)) {
-      for (const comp of EXAM_SCHEME) {
+      for (const comp of examScheme) {
         const raw = cells[comp.key]?.value;
         if (raw === '' || raw == null) continue;
         const num = Number(raw);
@@ -263,10 +277,10 @@ function Marks() {
     try {
       for (const [subject, cells] of Object.entries(draft.cells)) {
         const records = (marksByStudent[studentId] || []).filter(m => m.subject === subject);
-        const total = EXAM_SCHEME.reduce((a, c) => a + numOrZero(cells[c.key]?.value), 0);
+        const total = examScheme.reduce((a, c) => a + numOrZero(cells[c.key]?.value), 0);
         const grade = total >= 0 ? getGrade(total).grade : '';
 
-        for (const comp of EXAM_SCHEME) {
+        for (const comp of examScheme) {
           const raw = cells[comp.key]?.value;
           const num = raw === '' || raw == null ? null : Number(raw);
           const matches = records.filter(r => normalizeExamType(r.examType) === comp.key);
@@ -296,7 +310,7 @@ function Marks() {
         }
 
         // Remove any legacy extras not matching scheme
-        const legacyExtras = records.filter(r => !SCHEME_KEYS.has(normalizeExamType(r.examType)));
+        const legacyExtras = records.filter(r => !schemeKeys.has(normalizeExamType(r.examType)));
         for (const rec of legacyExtras) await deleteMark(rec.id);
       }
 
@@ -307,7 +321,7 @@ function Marks() {
         const cells = {};
         Object.entries(draft.cells).forEach(([subject, c]) => {
           const nc = {};
-          EXAM_SCHEME.forEach(comp => {
+          examScheme.forEach(comp => {
             const k = subject + '||' + comp.key;
             nc[comp.key] = {
               value: c[comp.key]?.value || '',
@@ -387,12 +401,17 @@ function Marks() {
       {/* Scheme legend */}
       <div className="scheme-legend">
         <span className="scheme-legend-title">Semester Marking Scheme</span>
-        {EXAM_SCHEME.map(e => (
+        {examScheme.map(e => (
           <span key={e.key} className="scheme-legend-chip">
             {e.key} <span className="scheme-legend-max">/{e.max}</span>
           </span>
         ))}
-        <span className="scheme-legend-total">Total: {SCHEME_TOTAL}</span>
+        <span className="scheme-legend-total">Total: {schemeTotal}</span>
+        {canEdit && (
+          <button className="scheme-settings-btn" onClick={() => setShowSettings(true)} title="Configure scheme & grading">
+            <Icon name="edit" size={14} style={{ marginRight: '4px' }} /> Settings
+          </button>
+        )}
       </div>
 
       {/* Student Accordion */}
@@ -449,7 +468,7 @@ function Marks() {
                           {canEdit && <th rowSpan="2" className="col-actions"></th>}
                         </tr>
                         <tr className="scheme-head-secondary">
-                          {EXAM_SCHEME.map(e => (
+                          {examScheme.map(e => (
                             <th key={e.key} className={'scheme-sub ' + (e.group === 'Sessional' ? 'sess' : e.key === 'Mid' ? 'mid' : 'fin')}>
                               {e.short}<span className="max-tag">/{e.max}</span>
                             </th>
@@ -460,7 +479,7 @@ function Marks() {
                         {draft.order.map(subject => {
                           const cells = draft.cells[subject];
                           if (!cells) return null;
-                          const total = EXAM_SCHEME.reduce((a, c) => a + numOrZero(cells[c.key]?.value), 0);
+                          const total = examScheme.reduce((a, c) => a + numOrZero(cells[c.key]?.value), 0);
                           const gradeInfo = total > 0 ? getGrade(total) : null;
                           const isNew = draft.newSubjects?.[subject];
                           const hasSavedMarks = (marksByStudent[student.id] || []).some(m => m.subject === subject);
@@ -479,7 +498,7 @@ function Marks() {
                                   <span className="subject-label">{subject}</span>
                                 )}
                               </td>
-                              {EXAM_SCHEME.map(comp => {
+                              {examScheme.map(comp => {
                                 const raw = cells[comp.key]?.value || '';
                                 const num = raw === '' ? null : Number(raw);
                                 const invalid = raw !== '' && (num === null || isNaN(num) || num < 0 || num > comp.max);
@@ -506,7 +525,7 @@ function Marks() {
                                 <span className="scheme-total" style={{ color: gradeInfo?.color }}>
                                   {total > 0 ? total : '\u2014'}
                                 </span>
-                                <span className="scheme-total-max">/{SCHEME_TOTAL}</span>
+                                <span className="scheme-total-max">/{schemeTotal}</span>
                               </td>
                               <td className="col-grade">
                                 {gradeInfo ? (
@@ -549,7 +568,7 @@ function Marks() {
 
                         {draft.order.length === 0 && (
                           <tr>
-                            <td colSpan={EXAM_SCHEME.length + 3 + (canEdit ? 1 : 0)} className="scheme-empty">
+                            <td colSpan={examScheme.length + 3 + (canEdit ? 1 : 0)} className="scheme-empty">
                               No marks recorded yet. Click "+ Add Subject" below to get started.
                             </td>
                           </tr>
@@ -565,7 +584,7 @@ function Marks() {
                       </button>
                       <div className="scheme-footer-right">
                         <span className="scheme-footer-hint">
-                          {'Sessional(' + EXAM_SCHEME.filter(e => e.group === 'Sessional').reduce((a, e) => a + e.max, 0) + ') + Mid(' + EXAM_SCHEME.find(e => e.key === 'Mid').max + ') + Final(' + EXAM_SCHEME.find(e => e.key === 'Final').max + ') = ' + SCHEME_TOTAL}
+                          {'Sessional(' + examScheme.filter(e => e.group === 'Sessional').reduce((a, e) => a + e.max, 0) + ') + Mid(' + examScheme.find(e => e.key === 'Mid').max + ') + Final(' + examScheme.find(e => e.key === 'Final').max + ') = ' + schemeTotal}
                         </span>
                         <button
                           className="btn btn-sm btn-primary"
@@ -649,6 +668,156 @@ function Marks() {
           </div>
         );
       })()}
+
+      {/* Settings overlay — Exam Scheme + Grading Thresholds */}
+      {showSettings && (
+        <SettingsOverlay
+          onClose={() => setShowSettings(false)}
+          onSaved={() => { setSettingsVersion(v => v + 1); setShowSettings(false); showToast('Settings saved.', 'success'); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Settings Overlay — configure exam scheme (max marks) and grade thresholds
+   ═══════════════════════════════════════════════════════════════════════════ */
+function SettingsOverlay({ onClose, onSaved }) {
+  const [scheme, setScheme] = useState(() => getExamScheme().map(e => ({ ...e })));
+  const [grades, setGrades] = useState(() => getGradeThresholds().map(g => ({ ...g })));
+  const schemeTotal = scheme.reduce((s, e) => s + (Number(e.max) || 0), 0);
+
+  const updateSchemeMax = (idx, val) => {
+    setScheme(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], max: Math.max(0, Number(val) || 0) };
+      return next;
+    });
+  };
+
+  const updateGradeMin = (idx, val) => {
+    setGrades(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], min: Math.max(0, Math.min(100, Number(val) || 0)) };
+      return next;
+    });
+  };
+
+  const updateGradeName = (idx, val) => {
+    setGrades(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], grade: val };
+      return next;
+    });
+  };
+
+  const addGradeRow = () => {
+    setGrades(prev => [...prev, { min: 0, grade: '' }]);
+  };
+
+  const removeGradeRow = (idx) => {
+    setGrades(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSave = () => {
+    setExamScheme(scheme);
+    setGradeThresholds(grades);
+    onSaved();
+  };
+
+  const handleReset = () => {
+    resetExamDefaults();
+    setScheme(getExamScheme().map(e => ({ ...e })));
+    setGrades(getGradeThresholds().map(g => ({ ...g })));
+  };
+
+  return (
+    <div className="subject-picker-overlay" onClick={onClose}>
+      <div className="settings-panel" onClick={e => e.stopPropagation()}>
+        <div className="subject-picker-header">
+          <h3>Marking Scheme & Grading</h3>
+          <button className="subject-picker-close" onClick={onClose}>
+            <Icon name="delete" size={16} />
+          </button>
+        </div>
+
+        <div className="settings-body">
+          {/* Exam scheme section */}
+          <div className="settings-section">
+            <h4 className="settings-section-title">Exam Components (Max Marks)</h4>
+            {scheme.map((comp, idx) => (
+              <div key={comp.key} className="settings-row">
+                <span className="settings-label">{comp.key}</span>
+                <span className="settings-group-tag">{comp.group}</span>
+                <input
+                  className="settings-input"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={comp.max}
+                  onChange={(e) => updateSchemeMax(idx, e.target.value)}
+                />
+              </div>
+            ))}
+            <div className="settings-row settings-total">
+              <span className="settings-label">Total</span>
+              <span className={'settings-total-value' + (schemeTotal === 100 ? '' : ' warn')}>{schemeTotal}</span>
+              {schemeTotal !== 100 && <span className="settings-hint">Should be 100</span>}
+            </div>
+          </div>
+
+          {/* Grading thresholds section */}
+          <div className="settings-section">
+            <h4 className="settings-section-title">Grading Thresholds</h4>
+            <p className="settings-hint" style={{ marginBottom: '8px' }}>
+              Marks at or above the threshold earn that grade. Sorted highest first.
+            </p>
+            {grades.map((g, idx) => (
+              <div key={idx} className="settings-row">
+                <input
+                  className="settings-input settings-input-small"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={g.min}
+                  onChange={(e) => updateGradeMin(idx, e.target.value)}
+                  title="Minimum marks"
+                />
+                <span className="settings-arrow">{'\u2192'}</span>
+                <input
+                  className="settings-input settings-input-grade"
+                  type="text"
+                  value={g.grade}
+                  onChange={(e) => updateGradeName(idx, e.target.value)}
+                  placeholder="Grade"
+                  title="Grade label"
+                />
+                <button
+                  className="settings-remove-btn"
+                  onClick={() => removeGradeRow(idx)}
+                  title="Remove row"
+                >
+                  <Icon name="delete" size={12} />
+                </button>
+              </div>
+            ))}
+            <button className="settings-add-btn" onClick={addGradeRow}>
+              <Icon name="plus" size={12} style={{ marginRight: '4px' }} /> Add Grade
+            </button>
+          </div>
+        </div>
+
+        <div className="subject-picker-footer" style={{ justifyContent: 'space-between' }}>
+          <button className="btn btn-sm btn-secondary" onClick={handleReset}>
+            Reset to Defaults
+          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn btn-sm btn-secondary" onClick={onClose}>Cancel</button>
+            <button className="btn btn-sm btn-primary" onClick={handleSave}>Save Settings</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

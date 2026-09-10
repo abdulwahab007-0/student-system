@@ -1,10 +1,10 @@
 // Shared score calculation utilities used consistently across Dashboard,
 // Students, and Marks pages so a student's average is always the same value.
 
-// ── Semester exam scheme ───────────────────────────────────────────────────
-// Each component has its own maximum total.  Assignment, Attendance & Quiz
-// are "sessional"; then Mid Term and Final Term bring the subject total to 100.
-export const EXAM_SCHEME = [
+// ── Configurable defaults ─────────────────────────────────────────────────
+// These are the factory-reset values. Users can override via localStorage.
+
+const DEFAULT_SCHEME = [
   { key: 'Assignment', short: 'Assign',  max: 10, group: 'Sessional' },
   { key: 'Attendance', short: 'Attend',  max: 5,  group: 'Sessional' },
   { key: 'Quiz',       short: 'Quiz',    max: 15, group: 'Sessional' },
@@ -12,14 +12,96 @@ export const EXAM_SCHEME = [
   { key: 'Final',      short: 'Final',   max: 40, group: 'Final Term' },
 ];
 
-export const SCHEME_TOTAL = EXAM_SCHEME.reduce((s, e) => s + e.max, 0); // 100
+const DEFAULT_GRADE_THRESHOLDS = [
+  { min: 90, grade: 'A+' },
+  { min: 85, grade: 'A'  },
+  { min: 80, grade: 'A-' },
+  { min: 75, grade: 'B+' },
+  { min: 70, grade: 'B'  },
+  { min: 65, grade: 'B-' },
+  { min: 60, grade: 'C+' },
+  { min: 50, grade: 'C'  },
+  { min: 40, grade: 'D'  },
+  { min: 0,  grade: 'F'  },
+];
 
+const STORAGE_KEY_SCHEME = 'sms_exam_scheme';
+const STORAGE_KEY_GRADES = 'sms_grade_thresholds';
+
+// ── Internal readers (fall back to defaults) ───────────────────────────────
+function readSchemeStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_SCHEME);
+    if (raw) { const p = JSON.parse(raw); if (Array.isArray(p) && p.length) return p; }
+  } catch {}
+  return DEFAULT_SCHEME;
+}
+
+function readGradeStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_GRADES);
+    if (raw) { const p = JSON.parse(raw); if (Array.isArray(p) && p.length) return p; }
+  } catch {}
+  return DEFAULT_GRADE_THRESHOLDS;
+}
+
+// ── Public API: exam scheme ────────────────────────────────────────────────
+/** Get the current exam scheme (fresh from localStorage). */
+export function getExamScheme() { return readSchemeStorage(); }
+
+/** Save a new exam scheme. */
+export function setExamScheme(scheme) {
+  try { localStorage.setItem(STORAGE_KEY_SCHEME, JSON.stringify(scheme)); } catch {}
+}
+
+/** Total marks across all components. */
+export function getSchemeTotal() { return readSchemeStorage().reduce((s, e) => s + e.max, 0); }
+
+/** Map of key → max marks. */
+export function getSchemeMax() {
+  const m = {};
+  readSchemeStorage().forEach(e => { m[e.key] = e.max; });
+  return m;
+}
+
+/** Set of valid keys. */
+export function getSchemeKeys() {
+  return new Set(readSchemeStorage().map(e => e.key));
+}
+
+/** Sessional component keys. */
+export function getSessionalKeys() {
+  return readSchemeStorage().filter(e => e.group === 'Sessional').map(e => e.key);
+}
+
+// ── Public API: grade thresholds ───────────────────────────────────────────
+/** Get grade thresholds sorted descending by min. */
+export function getGradeThresholds() {
+  return readGradeStorage().slice().sort((a, b) => b.min - a.min);
+}
+
+/** Save new grade thresholds. */
+export function setGradeThresholds(thresholds) {
+  try { localStorage.setItem(STORAGE_KEY_GRADES, JSON.stringify(thresholds)); } catch {}
+}
+
+/** Reset both scheme and grading to factory defaults. */
+export function resetExamDefaults() {
+  try {
+    localStorage.removeItem(STORAGE_KEY_SCHEME);
+    localStorage.removeItem(STORAGE_KEY_GRADES);
+  } catch {}
+}
+
+// ── Backward-compatible aliases (read fresh each time) ─────────────────────
+// These let existing import { EXAM_SCHEME, SCHEME_TOTAL, ... } continue to
+// work.  However, because they're module-level constants they only capture the
+// value at first import.  Prefer the getter functions above for dynamic use.
+export const EXAM_SCHEME = readSchemeStorage();
+export const SCHEME_TOTAL = EXAM_SCHEME.reduce((s, e) => s + e.max, 0);
 export const SCHEME_MAX = {};
 EXAM_SCHEME.forEach(e => { SCHEME_MAX[e.key] = e.max; });
-
 export const SCHEME_KEYS = new Set(EXAM_SCHEME.map(e => e.key));
-
-/** Sessional keys (first 3). */
 export const SESSIONAL_KEYS = EXAM_SCHEME.filter(e => e.group === 'Sessional').map(e => e.key);
 
 /** Map raw/legacy exam-type strings to scheme keys. */
@@ -51,6 +133,8 @@ export function normalizeExamType(raw) {
 export function getStudentAverage(marks) {
   if (!marks || marks.length === 0) return 0;
 
+  const schemeMax = getSchemeMax();
+
   const grouped = {};
   marks.forEach(m => {
     const subject = m.subject || 'Subject';
@@ -64,16 +148,14 @@ export function getStudentAverage(marks) {
     // Detect legacy mode: any record value exceeds its scheme max or is unknown type
     const isLegacy = records.some(r => {
       const key = normalizeExamType(r.examType);
-      return !SCHEME_MAX[key] || (Number(r.marks) || 0) > (SCHEME_MAX[key] || 100);
+      return !schemeMax[key] || (Number(r.marks) || 0) > (schemeMax[key] || 100);
     });
 
     let possible;
     if (isLegacy) {
-      // Legacy: each record was originally out of 100
       possible = records.length * 100;
     } else {
-      // New scheme: sum of component maxes
-      possible = records.reduce((sum, r) => sum + (SCHEME_MAX[normalizeExamType(r.examType)] || 100), 0);
+      possible = records.reduce((sum, r) => sum + (schemeMax[normalizeExamType(r.examType)] || 100), 0);
     }
     if (possible === 0) possible = Math.max(totalObtained, 1);
 
@@ -90,10 +172,11 @@ export function getStudentAverage(marks) {
  */
 export function getMarksTotals(marks) {
   const list = Array.isArray(marks) ? marks : [];
+  const schemeMax = getSchemeMax();
   const total = list.reduce((sum, m) => sum + (Number(m.marks) || 0), 0);
   const maxPossible = list.reduce((sum, m) => {
     const key = normalizeExamType(m.examType);
-    return sum + (SCHEME_MAX[key] || 100);
+    return sum + (schemeMax[key] || 100);
   }, 0);
   return { total, maxPossible: maxPossible || list.length * 100 };
 }

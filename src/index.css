@@ -2484,6 +2484,184 @@ input, select, textarea {
   justify-content: flex-end;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Settings Overlay — Exam Scheme + Grading Thresholds
+   ═══════════════════════════════════════════════════════════════════════════ */
+.scheme-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-bg);
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.scheme-settings-btn:hover {
+  background: var(--primary);
+  color: #fff;
+}
+
+.settings-panel {
+  width: 520px;
+  max-width: 94vw;
+  max-height: 88vh;
+  background: var(--white);
+  border-radius: 16px;
+  box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.settings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-section {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.settings-section-title {
+  margin: 0 0 12px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--dark);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.settings-row:last-child {
+  margin-bottom: 0;
+}
+
+.settings-label {
+  flex: 1;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--dark);
+  min-width: 90px;
+}
+
+.settings-group-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--gray);
+  background: var(--light-gray);
+  padding: 2px 8px;
+  border-radius: 4px;
+  min-width: 72px;
+  text-align: center;
+}
+
+.settings-input {
+  width: 70px;
+  padding: 6px 10px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--white);
+  color: var(--dark);
+  transition: border-color 0.2s;
+}
+.settings-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-bg);
+}
+
+.settings-input-small {
+  width: 56px;
+}
+
+.settings-input-grade {
+  width: 60px;
+  text-transform: uppercase;
+}
+
+.settings-arrow {
+  font-size: 0.9rem;
+  color: var(--gray);
+}
+
+.settings-total {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-total-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--success);
+}
+.settings-total-value.warn {
+  color: var(--danger);
+}
+
+.settings-hint {
+  font-size: 0.74rem;
+  color: var(--gray);
+  margin-left: auto;
+}
+
+.settings-remove-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--gray);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.settings-remove-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+.settings-add-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: transparent;
+  border: 1px dashed var(--primary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-top: 4px;
+}
+.settings-add-btn:hover {
+  background: var(--primary-bg);
+}
+
 /* ═════════════════════════════════════════════════════════════
    Auth Pages — Gratafy-style abstract login (light + dark)
    ═════════════════════════════════════════════════════════════ */
