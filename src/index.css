@@ -1004,6 +1004,120 @@ input, select, textarea {
   cursor: not-allowed;
 }
 
+/* ── Timetable ──────────────────────────────────────────────────────────── */
+.schedule-timetable-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.schedule-timetable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.85rem;
+  min-width: 700px;
+}
+.schedule-th {
+  padding: 12px 16px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--accent, var(--gray));
+  border-bottom: 2px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  background: color-mix(in srgb, var(--accent) 4%, var(--light-gray));
+  white-space: nowrap;
+}
+.schedule-th-day {
+  text-align: left;
+  color: var(--gray);
+  width: 130px;
+  border-bottom: 2px solid var(--border);
+}
+.schedule-th-ordinal {
+  font-size: 0.82rem;
+}
+.schedule-th-time {
+  font-size: 0.68rem;
+  font-weight: 500;
+  opacity: 0.7;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+.schedule-td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  vertical-align: top;
+}
+.schedule-td:last-child {
+  border-right: none;
+}
+.schedule-td-day {
+  white-space: nowrap;
+  background: var(--light-gray);
+  font-weight: 600;
+  color: var(--accent, var(--dark));
+}
+.schedule-cell-time {
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+  letter-spacing: 0.01em;
+}
+.schedule-cell-card {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--white));
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.schedule-cell-subject {
+  font-weight: 600;
+  font-size: 0.84rem;
+  color: var(--dark);
+  margin-bottom: 3px;
+}
+.schedule-cell-teacher {
+  font-size: 0.74rem;
+  color: var(--gray);
+  margin-bottom: 2px;
+}
+.schedule-cell-room {
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+.schedule-cell-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+.schedule-cell-add {
+  width: 100%;
+  padding: 14px 8px;
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--gray);
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.schedule-cell-add:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.schedule-cell-empty {
+  padding: 14px 8px;
+  text-align: center;
+  color: var(--border);
+  font-size: 0.78rem;
+  font-style: italic;
+}
+
 /* Cards / Panels */
 .panel {
   background: var(--white);

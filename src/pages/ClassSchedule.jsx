@@ -10,12 +10,33 @@ import ConfirmDialog from '../components/ConfirmDialog';
 // Admins can add / remove days and periods per day via the "Structure" editor.
 const DEFAULT_STRUCTURE = {
   days: [
-    { name: 'Friday', periods: ['08:00 - 09:30'] },
-    { name: 'Saturday', periods: ['08:00 - 09:30', '09:30 - 11:00', '11:00 - 12:30'] },
-    { name: 'Sunday', periods: ['08:00 - 09:30', '09:30 - 11:00', '11:00 - 12:30'] },
+    { name: 'Friday', periods: ['8:00 AM - 9:30 AM'] },
+    { name: 'Saturday', periods: ['8:00 AM - 9:30 AM', '9:30 AM - 11:00 AM', '11:00 AM - 12:30 PM'] },
+    { name: 'Sunday', periods: ['8:00 AM - 9:30 AM', '9:30 AM - 11:00 AM', '11:00 AM - 12:30 PM'] },
   ],
 };
-const DEFAULT_PERIOD = '08:00 - 09:30';
+const DEFAULT_PERIOD = '8:00 AM - 9:30 AM';
+
+// ── 12-hour time formatter ───────────────────────────────────────────────
+// Converts 24h time strings like "08:00 - 09:30" → "8:00 AM - 9:30 AM"
+// Passes through already-12h or non-parseable strings unchanged.
+const to12Hour = (label) => {
+  if (!label || typeof label !== 'string') return label;
+  // Match patterns like "08:00 - 09:30" or "8:00-9:30" or "08:00 to 09:30"
+  return label.replace(/(\d{1,2}):(\d{2})\s*(?:[-–—to]+\s*(\d{1,2}):(\d{2}))?/gi, (_, h1, m1, h2, m2) => {
+    const fmt = (h, m) => {
+      const hour = parseInt(h, 10);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+      return `${h12}:${m} ${ampm}`;
+    };
+    const start = fmt(h1, m1);
+    if (h2 != null && m2 != null) {
+      return `${start} - ${fmt(h2, m2)}`;
+    }
+    return start;
+  });
+};
 
 const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
 const slotColors = ['#059669', '#0284c7', '#16a34a', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#a21caf', '#ea580c', '#4f46e5'];
@@ -108,9 +129,10 @@ function StructureEditor({ structure, onCancel, onSave }) {
 
   const handleSave = () => {
     // Keep only days with a name; keep non-empty period labels.
+    // Auto-convert any 24h time labels to 12h format.
     const cleaned = draft.days
       .filter(d => d.name.trim())
-      .map(d => ({ name: d.name.trim(), periods: d.periods.map(p => p.trim()).filter(Boolean) }));
+      .map(d => ({ name: d.name.trim(), periods: d.periods.map(p => to12Hour(p.trim())).filter(Boolean) }));
     onSave({ days: cleaned });
   };
 
@@ -146,7 +168,7 @@ function StructureEditor({ structure, onCancel, onSave }) {
                   {ordinalLabel(pi)}
                 </span>
                 <input
-                  type="text" value={period} placeholder="e.g. 08:00 - 09:30"
+                  type="text" value={period} placeholder="e.g. 8:00 AM - 9:30 AM"
                   onChange={(e) => renamePeriod(di, pi, e.target.value)} style={{ ...inputStyle, flex: 1 }}
                 />
                 <button className="btn-icon delete" title="Remove period" onClick={() => removePeriod(di, pi)}>
@@ -207,7 +229,18 @@ function ClassSchedule() {
     if (!selectedClass) return;
     setLoading(true);
     api.getClassSchedule(selectedClass)
-      .then(data => setSchedule({ structure: data.structure || emptyStructure(), slots: data.slots || {} }))
+      .then(data => {
+        // Auto-convert any legacy 24h period labels to 12h format
+        const rawStructure = data.structure || emptyStructure();
+        const structure = {
+          ...rawStructure,
+          days: (rawStructure.days || []).map(d => ({
+            ...d,
+            periods: (d.periods || []).map(p => to12Hour(p)),
+          })),
+        };
+        setSchedule({ structure, slots: data.slots || {} });
+      })
       .catch(err => {
         console.error('Failed to load schedule:', err);
         setSchedule({ structure: emptyStructure(), slots: {} });
@@ -369,53 +402,63 @@ function ClassSchedule() {
             No days configured yet.{canManage ? ' Click "Structure" to add days and periods.' : ''}
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', minWidth: '700px' }}>
-            <thead>
-              <tr>
-                <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: '600', color: 'var(--gray)', borderBottom: '2px solid var(--border)', width: '130px', background: 'var(--light-gray)' }}>Day</th>
-                {Array.from({ length: maxPeriods(structure) || 1 }, (_, pi) => (
-                  <th key={pi} style={{ padding: '12px 14px', textAlign: 'center', fontWeight: '600', color: slotColors[pi % slotColors.length], borderBottom: `2px solid ${slotColors[pi % slotColors.length]}30`, background: `${slotColors[pi % slotColors.length]}08`, fontSize: '0.8rem' }}>{ordinalLabel(pi)} Period</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {days.map((day, di) => (
-                <tr key={`${day.name}_${di}`}>
-                  <td style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)', whiteSpace: 'nowrap', background: 'var(--light-gray)', fontWeight: '600', color: dayColors[di % dayColors.length] }}>
-                    {day.name}
-                  </td>
-                  {day.periods.map((timeLabel, pi) => {
-                    const slot = getSlot(day.name, pi);
-                    const color = slotColors[pi % slotColors.length];
+          <div className="schedule-timetable-wrap">
+            <table className="schedule-timetable">
+              <thead>
+                <tr>
+                  <th className="schedule-th schedule-th-day">Day</th>
+                  {Array.from({ length: maxPeriods(structure) || 1 }, (_, pi) => {
+                    // Find the first day that has this period index, to show its time in header
+                    const firstDayWithPeriod = days.find(d => d.periods.length > pi);
+                    const headerTime = firstDayWithPeriod ? to12Hour(firstDayWithPeriod.periods[pi]) : '';
                     return (
-                      <td key={`${day.name}_${pi}`} style={{ padding: '8px', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)', verticalAlign: 'top' }}>
-                        <div style={{ fontSize: '0.66rem', color, fontWeight: '600', marginBottom: '4px' }}>{timeLabel}</div>
-                        {slot ? (
-                          <div style={{ padding: '8px 10px', borderRadius: '8px', background: `${color}12`, border: `1px solid ${color}25`, cursor: canManage ? 'pointer' : 'default' }} onClick={() => canManage && openAddSlot(day.name, pi)}>
-                            <div style={{ fontWeight: '600', fontSize: '0.8rem', color: 'var(--dark)', marginBottom: '3px' }}>{slot.subject}</div>
-                            {slot.teacher && <div style={{ fontSize: '0.7rem', color: 'var(--gray)' }}>{slot.teacher}</div>}
-                            {slot.room && <div style={{ fontSize: '0.68rem', color, fontWeight: '500' }}>{slot.room}</div>}
-                            {canManage && (
-                              <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
-                                <button className="btn-icon edit" style={{ width: '24px', height: '24px' }} title="Edit" onClick={(e) => { e.stopPropagation(); openAddSlot(day.name, pi); }}><Icon name="edit" size={12} /></button>
-                                <button className="btn-icon delete" style={{ width: '24px', height: '24px' }} title="Delete" onClick={(e) => { e.stopPropagation(); setDeletingSlot({ day: day.name, timeIndex: pi }); }}><Icon name="delete" size={12} /></button>
-                              </div>
-                            )}
-                          </div>
-                        ) : canManage ? (
-                          <button onClick={() => openAddSlot(day.name, pi)} style={{ width: '100%', padding: '12px 8px', border: '2px dashed var(--border)', borderRadius: '8px', background: 'transparent', cursor: 'pointer', color: 'var(--gray)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                            <Icon name="plus" size={14} /> Add
-                          </button>
-                        ) : (
-                          <div style={{ padding: '12px 8px', textAlign: 'center', color: 'var(--border)', fontSize: '0.72rem', fontStyle: 'italic' }}>—</div>
-                        )}
-                      </td>
+                      <th key={pi} className="schedule-th" style={{ '--accent': slotColors[pi % slotColors.length] }}>
+                        <div className="schedule-th-ordinal">{ordinalLabel(pi)} Period</div>
+                        {headerTime && <div className="schedule-th-time"><Icon name="clock" size={10} /> {headerTime}</div>}
+                      </th>
                     );
                   })}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {days.map((day, di) => (
+                  <tr key={`${day.name}_${di}`}>
+                    <td className="schedule-td schedule-td-day" style={{ '--accent': dayColors[di % dayColors.length] }}>
+                      {day.name}
+                    </td>
+                    {day.periods.map((timeLabel, pi) => {
+                      const slot = getSlot(day.name, pi);
+                      const color = slotColors[pi % slotColors.length];
+                      return (
+                        <td key={`${day.name}_${pi}`} className="schedule-td">
+                          <div className="schedule-cell-time" style={{ color }}>{to12Hour(timeLabel)}</div>
+                          {slot ? (
+                            <div className="schedule-cell-card" style={{ '--accent': color, cursor: canManage ? 'pointer' : 'default' }} onClick={() => canManage && openAddSlot(day.name, pi)}>
+                              <div className="schedule-cell-subject">{slot.subject}</div>
+                              {slot.teacher && <div className="schedule-cell-teacher">{slot.teacher}</div>}
+                              {slot.room && <div className="schedule-cell-room" style={{ color }}>{slot.room}</div>}
+                              {canManage && (
+                                <div className="schedule-cell-actions">
+                                  <button className="btn-icon edit" title="Edit" onClick={(e) => { e.stopPropagation(); openAddSlot(day.name, pi); }}><Icon name="edit" size={12} /></button>
+                                  <button className="btn-icon delete" title="Delete" onClick={(e) => { e.stopPropagation(); setDeletingSlot({ day: day.name, timeIndex: pi }); }}><Icon name="delete" size={12} /></button>
+                                </div>
+                              )}
+                            </div>
+                          ) : canManage ? (
+                            <button className="schedule-cell-add" onClick={() => openAddSlot(day.name, pi)}>
+                              <Icon name="plus" size={14} /> Add
+                            </button>
+                          ) : (
+                            <div className="schedule-cell-empty">—</div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
       </>)}
