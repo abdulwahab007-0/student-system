@@ -122,7 +122,7 @@ function ManageSystemAdmin() {
     const result = await reset2FA(twoFATarget.id);
     if (result.success) {
       await load();
-      showToast(`${result.user.fullName}'s two-factor authentication has been reset.`, 'success');
+      showToast(`${result.user.fullName}'s two-factor authentication has been removed. They can now sign in with a single-step login.`, 'success');
     } else {
       showToast(result.message || 'Could not reset 2FA.', 'error');
     }
@@ -235,11 +235,20 @@ function ManageSystemAdmin() {
                     className="btn btn-secondary btn-sm"
                     disabled={!a.twoFactorEnabled}
                     title={a.twoFactorEnabled
-                      ? 'Reset two-factor authentication so they can set it up again'
+                      ? 'Remove two-factor authentication and allow a simple single-step login'
                       : 'Two-factor authentication is not active'}
                     onClick={() => setTwoFATarget(a)}
                   >
                     <Icon name="key" size={14} /> Reset 2FA
+                  </button>
+                )}
+                  {hasPermission('manage_2fa') && !a.twoFactorEnabled && (
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    title="Require two-factor authentication at their next login"
+                    onClick={() => setRequireTarget(a)}
+                  >
+                    <Icon name="key" size={14} /> Require 2FA
                   </button>
                 )}
                   <button
@@ -342,9 +351,18 @@ function ManageSystemAdmin() {
       {/* 2FA reset confirmation */}
       {twoFATarget && (
         <ConfirmDialog
-          message={`Reset two-factor authentication for ${twoFATarget.fullName}? Their authenticator app will be unlinked and they will be asked to scan a new QR code at their next login.`}
+          message={`Reset two-factor authentication for ${twoFATarget.fullName}? Their authenticator app will be unlinked and 2FA turned off — their next login will be a normal single-step login.`}
           onConfirm={handleReset2FA}
           onCancel={() => setTwoFATarget(null)}
+        />
+      )}
+
+      {/* Require 2FA confirmation */}
+      {requireTarget && (
+        <ConfirmDialog
+          message={`Require two-factor authentication for ${requireTarget.fullName}? At their next login they will be asked to scan a QR code with an authenticator app before they can sign in.`}
+          onConfirm={handleEnable2FA}
+          onCancel={() => setRequireTarget(null)}
         />
       )}
     </div>

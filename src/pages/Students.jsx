@@ -356,7 +356,7 @@ function Students() {
     }
     const result = await reset2FA(account.id);
     if (result.success) {
-      showToast(`Two-factor authentication reset for ${twoFAResetTarget.name}. They will re-set it up at their next login.`, 'success');
+      showToast(`Two-factor authentication removed for ${twoFAResetTarget.name}. They can now sign in with a single-step login.`, 'success');
     } else {
       showToast(result.message || 'Could not reset 2FA.', 'error');
     }
@@ -648,7 +648,7 @@ function Students() {
                                 <button
                                   className="btn btn-secondary btn-sm"
                                   style={{ fontSize: '0.62rem', padding: '2px 8px', fontWeight: '600' }}
-                                  title="Reset this student\u2019s two-factor authentication so they can set it up again"
+                                  title="Remove this student\u2019s two-factor authentication and allow a simple single-step login"
                                   onClick={() => setTwoFAResetTarget(student)}
                                 >
                                   🛡️ Reset 2FA
@@ -740,7 +740,7 @@ function Students() {
       {/* Reset 2FA confirmation */}
       {twoFAResetTarget && (
         <ConfirmDialog
-          message={`Reset two-factor authentication for ${twoFAResetTarget.name}? Their authenticator app will be unlinked and they will be asked to scan a new QR code at their next login.`}
+          message={`Reset two-factor authentication for ${twoFAResetTarget.name}? Their authenticator app will be unlinked and 2FA turned off — ${twoFAResetTarget.name}'s next login will be a normal single-step login.`}
           onConfirm={handleResetTwoFA}
           onCancel={() => setTwoFAResetTarget(null)}
         />

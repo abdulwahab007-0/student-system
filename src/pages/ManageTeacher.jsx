@@ -16,7 +16,7 @@ function getInitials(name) {
 }
 
 function ManageTeacher() {
-  const { getTeacherAccounts, grantTeacherAccount, resetPassword, reset2FA, revokeAccount, hasPermission } = useAuth();
+  const { getTeacherAccounts, grantTeacherAccount, resetPassword, reset2FA, enable2FA, revokeAccount, hasPermission } = useAuth();
   const showToast = useToast();
 
   const [teachers, setTeachers] = useState([]);
@@ -26,6 +26,7 @@ function ManageTeacher() {
   const [copied, setCopied] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState(null);
   const [twoFATarget, setTwoFATarget] = useState(null);
+  const [requireTarget, setRequireTarget] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -113,11 +114,23 @@ function ManageTeacher() {
     const result = await reset2FA(twoFATarget.account.id);
     if (result.success) {
       await load();
-      showToast(`${result.user.fullName}'s two-factor authentication has been reset.`, 'success');
+      showToast(`${result.user.fullName}'s two-factor authentication has been removed. They can now sign in with a single-step login.`, 'success');
     } else {
       showToast(result.message || 'Could not reset 2FA.', 'error');
     }
     setTwoFATarget(null);
+  };
+
+  const handleEnable2FA = async () => {
+    if (!requireTarget?.account) return;
+    const result = await enable2FA(requireTarget.account.id);
+    if (result.success) {
+      await load();
+      showToast(`${result.user.fullName}'s two-factor authentication is now required.`, 'success');
+    } else {
+      showToast(result.message || 'Could not enable 2FA.', 'error');
+    }
+    setRequireTarget(null);
   };
 
   return (
@@ -248,11 +261,20 @@ function ManageTeacher() {
                       className="btn btn-secondary btn-sm"
                       disabled={!t.account.twoFactorEnabled}
                       title={t.account.twoFactorEnabled
-                        ? 'Reset two-factor authentication so they can set it up again'
+                        ? 'Remove two-factor authentication and allow a simple single-step login'
                         : 'Two-factor authentication is not active'}
                       onClick={() => setTwoFATarget(t)}
                     >
                       <Icon name="key" size={14} /> Reset 2FA
+                    </button>
+                    )}
+                    {hasPermission('manage_2fa') && !t.account.twoFactorEnabled && (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      title="Require two-factor authentication at their next login"
+                      onClick={() => setRequireTarget(t)}
+                    >
+                      <Icon name="key" size={14} /> Require 2FA
                     </button>
                     )}
                     <button className="btn btn-danger btn-sm" onClick={() => setRevokeTarget(t)}>
@@ -320,9 +342,18 @@ function ManageTeacher() {
       {/* 2FA reset confirmation */}
       {twoFATarget && (
         <ConfirmDialog
-          message={`Reset two-factor authentication for ${twoFATarget.name}? Their authenticator app will be unlinked and they will be asked to scan a new QR code at their next login.`}
+          message={`Reset two-factor authentication for ${twoFATarget.name}? Their authenticator app will be unlinked and 2FA turned off — their next login will be a normal single-step login.`}
           onConfirm={handleReset2FA}
           onCancel={() => setTwoFATarget(null)}
+        />
+      )}
+
+      {/* Require 2FA confirmation */}
+      {requireTarget && (
+        <ConfirmDialog
+          message={`Require two-factor authentication for ${requireTarget.name}? At their next login they will be asked to scan a QR code with an authenticator app before they can sign in.`}
+          onConfirm={handleEnable2FA}
+          onCancel={() => setRequireTarget(null)}
         />
       )}
     </div>

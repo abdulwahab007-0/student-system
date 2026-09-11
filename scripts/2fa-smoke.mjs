@@ -1,14 +1,22 @@
 // E2E smoke test: full TOTP 2FA flow against the real Express app (SQLite backend)
-import Database from 'better-sqlite3';
-import { authenticator } from 'otplib';
-import app from '../server/app.js';
-import { initDatabase } from '../server/db.js';
+// The .env file sets SUPABASE_DB_URL for production; pin this test to the local
+// SQLite copy by blanking the Supabase vars BEFORE db.js is imported (db.js
+// calls loadEnvFile, which never overrides already-present keys).
+process.env.SUPABASE_DB_URL = '';
+process.env.DATABASE_URL = '';
+
+const [{ default: Database }, { authenticator }, { default: app }, { initDatabase }] = await Promise.all([
+  import('better-sqlite3'),
+  import('otplib'),
+  import('../server/app.js'),
+  import('../server/db.js'),
+]);
 
 // Apply schema migrations (adds the 2FA columns to the existing DB), then give a
 // fresh 2FA slate so the test exercises the whole flow deterministically.
 await initDatabase();
 const sqlite = new Database('./database.sqlite');
-sqlite.prepare("UPDATE users SET twoFactorEnabled=0, twoFactorSecret=NULL WHERE username IN ('admin','student')").run();
+sqlite.prepare("UPDATE users SET twoFactorEnabled=0, twoFactorSecret=NULL WHERE username IN ('admin','cr.admin','student')").run();
 sqlite.close();
 
 const BASE = 'http://localhost:3199';
@@ -25,9 +33,21 @@ try {
   let r = await post('/api/auth/login', { username: 'admin', password: 'wrong' });
   ok('wrong password rejected', r.status === 401);
 
-  // 2) First admin login → setup mode with QR
+  // 2) First admin login is single-step while 2FA is not required for them
   r = await post('/api/auth/login', { username: 'admin', password: 'admin123' });
-  ok('admin first login returns twoFactor=setup', r.data.twoFactor === 'setup');
+  ok('admin login is single-step while 2FA not required', !!r.data.token && !r.data.twoFactor);
+  const adminToken = r.data.token;
+  const authHeader = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + adminToken };
+  const put = (p, body) => fetch(BASE + '/api' + p, { method: 'PUT', headers: authHeader, body: JSON.stringify(body || {}) }).then(async r => ({ status: r.status, data: await r.json() }));
+
+  // 2b) Super admin (manage_2fa) requires 2FA for themselves → next login = setup flow
+  const adb = new Database('./database.sqlite');
+  const adminRow = adb.prepare("SELECT id FROM users WHERE username='admin'").get();
+  adb.close();
+  r = await put(`/auth/enable-2fa/${adminRow.id}`);
+  ok('enable-2fa works for an admin account (self)', r.status === 200 && r.data.success === true);
+  r = await post('/api/auth/login', { username: 'admin', password: 'admin123' });
+  ok('admin login returns twoFactor=setup after Require 2FA', r.data.twoFactor === 'setup');
   ok('setup provides base32 secret', /^[A-Z2-7]{16,}$/.test(r.data.secret || ''));
   ok('setup provides otpauth URL', (r.data.otpauthUrl || '').startsWith('otpauth://totp/'));
   ok('setup provides a QR data URL', (r.data.qrDataUrl || '').startsWith('data:image/png;base64,'));
@@ -41,7 +61,7 @@ try {
   // 4) Correct OTP from the same secret → activates 2FA + issues token
   const totp = authenticator.generate(secret);
   r = await post('/api/auth/2fa/verify', { username: 'admin', otp: totp });
-  ok('correct OTP activates + returns token', !!r.data.token && r.data.twoFactorJustSetup === true);
+  ok('correct OTP activates + returns token', !!r.data.token && r.data.twoFactorJustSetup === false);
   ok('token response does not leak secret', !('twoFactorSecret' in (r.data.user || {})));
   const token = r.data.token;
 
@@ -59,9 +79,31 @@ try {
   r = await post('/api/auth/2fa/verify', { username: 'admin', otp: authenticator.generate(secret) });
   ok('OTP completes subsequent login', !!r.data.token && r.data.twoFactorJustSetup === false);
 
-  // 8) Other admins are also forced through setup (cr.admin)
+  // 8) Other admins are NOT forced through setup — 2FA is only enforced when
+  // the twoFactorEnabled flag is set (Require 2FA). cr.admin has it off, so
+  // their login is single-step just like a student's.
   r = await post('/api/auth/login', { username: 'cr.admin', password: 'cr123' });
-  ok('other admins also forced through setup', r.data.twoFactor === 'setup');
+  ok('cr.admin login is single-step when 2FA is not required', !!r.data.token && !r.data.twoFactor);
+
+  // 8b) Require 2FA for cr.admin (manage_2fa right, endpoint backed by super_admin) →
+  //     next login runs the QR setup flow, exactly like students.
+  const crDB = new Database('./database.sqlite');
+  const crRow = crDB.prepare("SELECT id FROM users WHERE username='cr.admin'").get();
+  const crId = crRow.id;
+  crDB.close();
+  r = await put(`/auth/enable-2fa/${crId}`);
+  ok('enable-2fa works for another admin (cr.admin)', r.status === 200 && r.data.success === true);
+  r = await post('/api/auth/login', { username: 'cr.admin', password: 'cr123' });
+  ok('cr.admin now returns twoFactor=setup after Require 2FA', r.data.twoFactor === 'setup');
+  const crSecret = r.data.secret;
+  r = await post('/api/auth/2fa/verify', { username: 'cr.admin', otp: authenticator.generate(crSecret) });
+  ok('cr.admin OTP activates 2FA + issues token', !!r.data.token && r.data.twoFactorJustSetup === false);
+
+  // 8c) Remove 2FA again (reset_2fa right) → cr.admin login is single-step again.
+  r = await put(`/auth/reset-2fa/${crId}`);
+  ok('reset-2fa removes 2FA for another admin', r.status === 200 && r.data.success === true);
+  r = await post('/api/auth/login', { username: 'cr.admin', password: 'cr123' });
+  ok('cr.admin login single-step again after Reset 2FA', !!r.data.token && !r.data.twoFactor);
 
   // 9) Students are NOT forced through 2FA (seed student username: ahmed.khan)
   const sdb = new Database('./database.sqlite');

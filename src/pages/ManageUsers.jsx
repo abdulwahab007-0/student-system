@@ -80,7 +80,7 @@ function ManageUsers() {
     const result = await reset2FA(twoFATarget.id);
     if (result.success) {
       showToast(
-        `${result.user.fullName}'s two-factor authentication has been reset. They will be prompted to set it up again at their next login.`,
+        `${result.user.fullName}'s two-factor authentication has been removed. They can now sign in with a single-step login.`,
         'success'
       );
       refreshUsers(); // flip the 2FA badge to Off right away
@@ -328,14 +328,14 @@ function ManageUsers() {
                   className="btn btn-secondary btn-sm"
                   disabled={!user.twoFactorEnabled}
                   title={user.twoFactorEnabled
-                    ? "Reset this user's 2FA so they can set it up again on their next login"
+                    ? "Remove this user's 2FA and allow a simple single-step login"
                     : 'Two-factor authentication is not active for this user'}
                   onClick={() => setTwoFATarget(user)}
                 >
                   🛡️ Reset 2FA
                 </button>
                 )}
-                {hasPermission('manage_2fa') && user.role === 'student' && !user.twoFactorEnabled && (
+                {hasPermission('manage_2fa') && !user.twoFactorEnabled && (
                 <button
                   className="btn btn-secondary btn-sm"
                   title="Require this user to set up two-factor authentication at their next login"
@@ -378,7 +378,7 @@ function ManageUsers() {
       {/* 2FA reset confirmation */}
       {twoFATarget && (
         <ConfirmDialog
-          message={`Reset two-factor authentication for ${twoFATarget.fullName} (@${twoFATarget.username})? Their authenticator app will be unlinked and they will be asked to scan a new QR code at their next login.`}
+          message={`Reset two-factor authentication for ${twoFATarget.fullName} (@${twoFATarget.username})? Their authenticator app will be unlinked and 2FA turned off — their next login will be a normal single-step login.`}
           onConfirm={handleReset2FA}
           onCancel={() => setTwoFATarget(null)}
         />

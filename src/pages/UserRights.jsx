@@ -93,12 +93,12 @@ const rightsData = [
             },
             {
                 key: "manage_2fa",
-                label: "Require Two-Factor Authentication (2FA)",
+                label: "Require 2FA (Add — any user type: admin / teacher / student)",
                 roles: ["super_admin"],
             },
             {
                 key: "reset_2fa",
-                label: "Reset 2-Factor Authentication (2FA)",
+                label: "Remove / Reset 2FA (Allow single-step login again)",
                 roles: ["super_admin"],
             },
             {

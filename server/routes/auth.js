@@ -9,9 +9,7 @@ import QRCode from 'qrcode';
 const authenticator = otplibPkg.authenticator || otplibPkg.default?.authenticator;
 const ISSUER = 'NCBA e-Student System';
 
-// Roles that are forced through two-factor authentication (TOTP). Students
-// keep the normal single-step login.
-const ADMIN_ROLES = ['super_admin', 'teacher_admin', 'cr_admin'];
+
 
 // Simple in-memory throttling for the 2FA endpoint. Serverless instances run
 // a short lifetime, so this is a best-effort brute-force guard (per instance),
@@ -79,28 +77,10 @@ router.post('/login', async (req, res) => {
     return res.json({ twoFactor: 'verify', username: user.username, fullName: user.fullName });
   }
 
-  if (ADMIN_ROLES.includes(user.role)) {
-    // First-time admin login → generate (and persist) a TOTP secret, show the
-    // QR code, and only issue a token after the scanned code is verified.
-    let secret = user.twoFactorSecret;
-    if (!secret) {
-      secret = authenticator.generateSecret();
-      await db.run('UPDATE users SET twoFactorSecret = ? WHERE id = ?', [secret, user.id]);
-      user.twoFactorSecret = secret;
-    }
-    const otpauthUrl = authenticator.keyuri(user.username, ISSUER, secret);
-    const qrDataUrl = await QRCode.toDataURL(otpauthUrl, { width: 240, margin: 1, errorCorrectionLevel: 'M' });
-    return res.json({
-      twoFactor: 'setup',
-      username: user.username,
-      fullName: user.fullName,
-      secret,
-      otpauthUrl,
-      qrDataUrl,
-    });
-  }
-
-  // Regular (student) login — unchanged behaviour.
+  // Issue the token immediately for accounts that do not have 2FA required.
+  // Admins and students are treated identically here — 2FA is strictly driven
+  // by the twoFactorEnabled flag (set via the Require 2FA / Reset 2FA actions),
+  // so it can be added and removed as needed.
   const token = generateToken(user);
   res.json({ token, user: toSafeUser(user) });
 });
