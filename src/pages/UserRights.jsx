@@ -87,6 +87,11 @@ const rightsData = [
             { key: "view_users", label: "View All Users", roles: ["super_admin", "cr_admin", "teacher_admin"] },
             { key: "reset_passwords", label: "Reset Passwords", roles: ["super_admin", "cr_admin", "teacher_admin"] },
             {
+                key: "reset_2fa",
+                label: "Reset 2-Factor Authentication (2FA)",
+                roles: ["super_admin"],
+            },
+            {
                 key: "create_accounts",
                 label: "Create User Accounts",
                 roles: ["super_admin", "cr_admin", "teacher_admin"],

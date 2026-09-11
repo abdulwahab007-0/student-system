@@ -15,7 +15,7 @@ function getInitials(name) {
 }
 
 function ManageSystemAdmin() {
-  const { getAdminAccounts, createAdminAccount, resetPassword, revokeAccount, currentUser } = useAuth();
+  const { getAdminAccounts, createAdminAccount, resetPassword, reset2FA, revokeAccount, currentUser } = useAuth();
   const showToast = useToast();
 
   const [admins, setAdmins] = useState([]);
@@ -26,6 +26,7 @@ function ManageSystemAdmin() {
   const [credentials, setCredentials] = useState(null);
   const [copied, setCopied] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState(null);
+  const [twoFATarget, setTwoFATarget] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -115,6 +116,18 @@ function ManageSystemAdmin() {
     }
   };
 
+  const handleReset2FA = async () => {
+    if (!twoFATarget) return;
+    const result = await reset2FA(twoFATarget.id);
+    if (result.success) {
+      await load();
+      showToast(`${result.user.fullName}'s two-factor authentication has been reset.`, 'success');
+    } else {
+      showToast(result.message || 'Could not reset 2FA.', 'error');
+    }
+    setTwoFATarget(null);
+  };
+
   return (
     <div>
       <div className="page-header">
@@ -182,6 +195,14 @@ function ManageSystemAdmin() {
                       {a.username === 'admin' && (
                         <span className="role-pill" style={{ background: 'var(--warning-bg)', color: 'var(--warning)' }}>Primary</span>
                       )}
+                      <span
+                        className="role-pill"
+                        style={a.twoFactorEnabled
+                          ? { background: 'var(--success-bg)', color: 'var(--success)' }
+                          : { background: 'var(--secondary-bg)', color: 'var(--gray)' }}
+                      >
+                        {a.twoFactorEnabled ? '2FA On' : '2FA Off'}
+                      </span>
                     </div>
                     <div className="account-card-sub">@{a.username}</div>
                     <div className="account-card-meta">
@@ -192,6 +213,16 @@ function ManageSystemAdmin() {
                 <div className="account-card-actions">
                   <button className="btn btn-secondary btn-sm" onClick={() => handleReset(a)}>
                     <Icon name="key" size={14} /> Reset Password
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    disabled={!a.twoFactorEnabled}
+                    title={a.twoFactorEnabled
+                      ? 'Reset two-factor authentication so they can set it up again'
+                      : 'Two-factor authentication is not active'}
+                    onClick={() => setTwoFATarget(a)}
+                  >
+                    <Icon name="key" size={14} /> Reset 2FA
                   </button>
                   <button
                     className="btn btn-danger btn-sm"
@@ -287,6 +318,15 @@ function ManageSystemAdmin() {
           message={`Revoke administrator access for ${revokeTarget.fullName}? Their Super Admin account will be demoted and they will lose full control of the portal.`}
           onConfirm={handleRevoke}
           onCancel={() => setRevokeTarget(null)}
+        />
+      )}
+
+      {/* 2FA reset confirmation */}
+      {twoFATarget && (
+        <ConfirmDialog
+          message={`Reset two-factor authentication for ${twoFATarget.fullName}? Their authenticator app will be unlinked and they will be asked to scan a new QR code at their next login.`}
+          onConfirm={handleReset2FA}
+          onCancel={() => setTwoFATarget(null)}
         />
       )}
     </div>

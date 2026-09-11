@@ -147,6 +147,7 @@ const api = {
   changePassword: (userId, oldPassword, newPassword) =>
     request('PUT', '/auth/change-password', { userId, oldPassword, newPassword }),
   resetPassword: (id) => request('PUT', `/auth/reset-password/${id}`),
+  reset2FA: (id) => request('PUT', `/auth/reset-2fa/${id}`),
   assignCR: (studentId, options) => request('POST', '/auth/assign-cr', { studentId, ...options }),
   removeCR: (studentId) => request('DELETE', '/auth/remove-cr', { studentId }),
 

@@ -162,6 +162,18 @@ router.put('/reset-password/:id', authMiddleware, requirePermission('reset_passw
   res.json({ success: true, user: { id: user.id, username: user.username, password: defaultPw, fullName: user.fullName } });
 });
 
+// PUT /api/auth/reset-2fa/:id
+// Clears an admin's TOTP secret and disables 2FA so they can re-set up their
+// authenticator app at their next login (lost/broken phone recovery).
+// Guarded by the 'reset_2fa' right — configurable per role or per user from the
+// User Rights page.
+router.put('/reset-2fa/:id', authMiddleware, requirePermission('reset_2fa'), async (req, res) => {
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [req.params.id]);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  await db.run('UPDATE users SET twoFactorSecret = NULL, twoFactorEnabled = 0 WHERE id = ?', [user.id]);
+  res.json({ success: true, user: { id: user.id, username: user.username, fullName: user.fullName } });
+});
+
 router.post('/assign-cr', authMiddleware, requirePermission('assign_cr'), async (req, res) => {
   const { studentId, manageAllClasses } = req.body;
   if (!studentId) return res.status(400).json({ error: 'studentId required' });

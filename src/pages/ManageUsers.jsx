@@ -15,12 +15,13 @@ function getInitials(name) {
 }
 
 function ManageUsers() {
-  const { users, currentUser, resetPassword, roleLabel, hasPermission, removeUser } = useAuth();
+  const { users, currentUser, resetPassword, reset2FA, refreshUsers, roleLabel, hasPermission, removeUser } = useAuth();
   const showToast = useToast();
 
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [resetTarget, setResetTarget] = useState(null);
+  const [twoFATarget, setTwoFATarget] = useState(null);
   const [newCredentials, setNewCredentials] = useState(null);
   const [copied, setCopied] = useState(false);
   const [selected, setSelected] = useState([]);
@@ -47,6 +48,8 @@ function ManageUsers() {
   };
 
   const roles = ['super_admin', 'cr_admin', 'teacher_admin', 'student'];
+  // Only admin-role logins are forced through TOTP 2FA, so 2FA actions only apply to them.
+  const adminRole = (role) => ['super_admin', 'cr_admin', 'teacher_admin'].includes(role);
 
   const filteredUsers = users.filter(u => {
     const matchesSearch = !search ||
@@ -71,6 +74,21 @@ function ManageUsers() {
       setCopied(false);
     }
     setResetTarget(null);
+  };
+
+  const handleReset2FA = async () => {
+    if (!twoFATarget) return;
+    const result = await reset2FA(twoFATarget.id);
+    if (result.success) {
+      showToast(
+        `${result.user.fullName}'s two-factor authentication has been reset. They will be prompted to set it up again at their next login.`,
+        'success'
+      );
+      refreshUsers(); // flip the 2FA badge to Off right away
+    } else {
+      showToast(result.message || 'Could not reset 2FA.', 'error');
+    }
+    setTwoFATarget(null);
   };
 
   const copyCredentials = () => {
@@ -261,6 +279,17 @@ function ManageUsers() {
                       >
                         {roleLabel(user.role)}
                       </span>
+                      {adminRole(user.role) && (
+                        <span
+                          className={`badge ${user.twoFactorEnabled ? 'success' : 'info'}`}
+                          style={{ marginLeft: '6px', fontSize: '0.62rem', padding: '2px 8px', verticalAlign: 'middle' }}
+                          title={user.twoFactorEnabled
+                            ? 'Two-factor authentication (TOTP) is active for this login'
+                            : 'Two-factor authentication is not active for this login'}
+                        >
+                          {user.twoFactorEnabled ? '2FA On' : '2FA Off'}
+                        </span>
+                      )}
                       {currentUser?.id === user.id && (
                         <span style={{ marginLeft: '6px', fontSize: '0.72rem', color: 'var(--primary)', fontWeight: '500' }}>
                           (You)
@@ -280,6 +309,18 @@ function ManageUsers() {
                   onClick={() => setResetTarget(user)}
                 >
                   🔑 Reset
+                </button>
+                )}
+                {hasPermission('reset_2fa') && adminRole(user.role) && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  disabled={!user.twoFactorEnabled}
+                  title={user.twoFactorEnabled
+                    ? "Reset this user's 2FA so they can set it up again on their next login"
+                    : 'Two-factor authentication is not active for this user'}
+                  onClick={() => setTwoFATarget(user)}
+                >
+                  🛡️ Reset 2FA
                 </button>
                 )}
                 {hasPermission('remove_users') && removable(user) && (
@@ -310,6 +351,15 @@ function ManageUsers() {
           message={`Reset the password for ${resetTarget.fullName} (@${resetTarget.username})? They will need to sign in with the new default password shown next.`}
           onConfirm={handleReset}
           onCancel={() => setResetTarget(null)}
+        />
+      )}
+
+      {/* 2FA reset confirmation */}
+      {twoFATarget && (
+        <ConfirmDialog
+          message={`Reset two-factor authentication for ${twoFATarget.fullName} (@${twoFATarget.username})? Their authenticator app will be unlinked and they will be asked to scan a new QR code at their next login.`}
+          onConfirm={handleReset2FA}
+          onCancel={() => setTwoFATarget(null)}
         />
       )}
 

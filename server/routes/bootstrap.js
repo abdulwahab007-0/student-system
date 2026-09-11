@@ -23,7 +23,7 @@ import { userHasRight } from '../middleware/auth.js';
 const router = Router();
 
 const USER_COLUMNS =
-  'id,username,email,fullName,role,status,className,registrationDate,linkedStudentId,crForClass,manageAllClasses';
+  'id,username,email,fullName,role,status,className,registrationDate,linkedStudentId,crForClass,manageAllClasses,twoFactorEnabled';
 
 function toRoleOverrides(rows) {
   const overrides = {};

@@ -16,7 +16,7 @@ function getInitials(name) {
 }
 
 function ManageTeacher() {
-  const { getTeacherAccounts, grantTeacherAccount, resetPassword, revokeAccount } = useAuth();
+  const { getTeacherAccounts, grantTeacherAccount, resetPassword, reset2FA, revokeAccount } = useAuth();
   const showToast = useToast();
 
   const [teachers, setTeachers] = useState([]);
@@ -25,6 +25,7 @@ function ManageTeacher() {
   const [credentials, setCredentials] = useState(null);
   const [copied, setCopied] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState(null);
+  const [twoFATarget, setTwoFATarget] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -105,6 +106,18 @@ function ManageTeacher() {
     } else {
       showToast(res.message || 'Could not revoke account.', 'error');
     }
+  };
+
+  const handleReset2FA = async () => {
+    if (!twoFATarget?.account) return;
+    const result = await reset2FA(twoFATarget.account.id);
+    if (result.success) {
+      await load();
+      showToast(`${result.user.fullName}'s two-factor authentication has been reset.`, 'success');
+    } else {
+      showToast(result.message || 'Could not reset 2FA.', 'error');
+    }
+    setTwoFATarget(null);
   };
 
   return (
@@ -197,6 +210,16 @@ function ManageTeacher() {
                     {t.account
                       ? <span className="role-pill role-badge-teacher">Teacher Admin</span>
                       : <span className="role-pill role-badge-student">No Account</span>}
+                    {t.account && (
+                      <span
+                        className="role-pill"
+                        style={t.account.twoFactorEnabled
+                          ? { background: 'var(--success-bg)', color: 'var(--success)' }
+                          : { background: 'var(--secondary-bg)', color: 'var(--gray)' }}
+                      >
+                        {t.account.twoFactorEnabled ? '2FA On' : '2FA Off'}
+                      </span>
+                    )}
                   </div>
                   <div className="account-card-sub">
                     {[t.subject, t.className].filter(Boolean).join(' • ') || '—'}
@@ -217,6 +240,16 @@ function ManageTeacher() {
                   <>
                     <button className="btn btn-secondary btn-sm" onClick={() => handleReset(t)}>
                       <Icon name="key" size={14} /> Reset Password
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      disabled={!t.account.twoFactorEnabled}
+                      title={t.account.twoFactorEnabled
+                        ? 'Reset two-factor authentication so they can set it up again'
+                        : 'Two-factor authentication is not active'}
+                      onClick={() => setTwoFATarget(t)}
+                    >
+                      <Icon name="key" size={14} /> Reset 2FA
                     </button>
                     <button className="btn btn-danger btn-sm" onClick={() => setRevokeTarget(t)}>
                       <Icon name="delete" size={14} /> Revoke
@@ -277,6 +310,15 @@ function ManageTeacher() {
           message={`Revoke access for ${revokeTarget.name}? Their Teacher Admin account will be demoted to a regular student role and they will no longer be able to sign in as a teacher.`}
           onConfirm={handleRevoke}
           onCancel={() => setRevokeTarget(null)}
+        />
+      )}
+
+      {/* 2FA reset confirmation */}
+      {twoFATarget && (
+        <ConfirmDialog
+          message={`Reset two-factor authentication for ${twoFATarget.name}? Their authenticator app will be unlinked and they will be asked to scan a new QR code at their next login.`}
+          onConfirm={handleReset2FA}
+          onCancel={() => setTwoFATarget(null)}
         />
       )}
     </div>

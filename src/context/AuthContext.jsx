@@ -28,6 +28,7 @@ const DEFAULT_PERMISSIONS = {
     approve_users: ["super_admin", "cr_admin", "teacher_admin"],
     view_users: ["super_admin", "cr_admin", "teacher_admin"],
     reset_passwords: ["super_admin"],
+    reset_2fa: ["super_admin"],
     create_accounts: ["super_admin", "cr_admin", "teacher_admin"],
     remove_users: ["super_admin"],
     assign_cr: ["super_admin", "cr_admin"],
@@ -218,6 +219,18 @@ export function AuthProvider({ children }) {
             const result = await api.resetPassword(userId);
             showToast(`${result.user.fullName}'s password has been reset.`, "info");
             return { success: true, newPassword: result.user.password, user: result.user };
+        } catch (err) {
+            return { success: false, message: err.message };
+        }
+    };
+
+    // Clears an admin's 2FA (TOTP secret + enabled flag). The user will be asked
+    // to scan a fresh QR code at their next login. Gated by the 'reset_2fa' right.
+    const reset2FA = async (userId) => {
+        try {
+            const result = await api.reset2FA(userId);
+            showToast(`${result.user.fullName}'s two-factor authentication has been reset.`, "info");
+            return { success: true, user: result.user };
         } catch (err) {
             return { success: false, message: err.message };
         }
@@ -423,12 +436,13 @@ export function AuthProvider({ children }) {
     const value = {
         currentUser, users, pendingUsers,
         login, logout, register, changePassword, complete2FA,
-        assignCR, removeCR, createAccount, resetPassword,
+        assignCR, removeCR, createAccount, resetPassword, reset2FA,
         defaultPasswordFor, approveUser, rejectUser,
         isAdmin, canManageStudents, canApproveUsers, isSuperAdmin,
         roleLabel, rolePermissions, roleHasRight, hasPermission,
         setRolePermission, resetRolePermissions,
         userPermissions, setUserPermission, resetUserPermissions,
+        refreshUsers,
         getTeacherAccounts, getAdminAccounts,
         grantTeacherAccount, createAdminAccount, revokeAccount, removeUser,
     };
