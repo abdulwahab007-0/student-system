@@ -1,7 +1,13 @@
 import jwt from 'jsonwebtoken';
 import db from '../db.js';
 
-const SECRET = process.env.JWT_SECRET || 'ncba-e-sms-dev-secret-2026';
+// JWT signing secret. Production MUST provide JWT_SECRET — we refuse to start
+// with a hardcoded default because a known shared secret makes every token
+// forgeable. Vercel injects JWT_SECRET automatically; local dev reads .env.
+const SECRET = process.env.JWT_SECRET;
+if (!SECRET) {
+  throw new Error('JWT_SECRET environment variable is required (see .env.example)');
+}
 const EXPIRES_IN = '24h';
 
 export function generateToken(user) {
