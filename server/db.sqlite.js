@@ -18,7 +18,8 @@ export function initDatabase() {
       status TEXT NOT NULL DEFAULT 'pending',
       className TEXT, registrationDate TEXT NOT NULL,
       linkedStudentId INTEGER, crForClass TEXT,
-      manageAllClasses INTEGER DEFAULT 0
+      manageAllClasses INTEGER DEFAULT 0,
+      twoFactorSecret TEXT, twoFactorEnabled INTEGER DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS students (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,6 +92,14 @@ export function initDatabase() {
     // Migration: add linkedTeacherId to users if missing (to link teacher logins)
     if (!userColumns.includes("linkedTeacherId")) {
         db.exec("ALTER TABLE users ADD COLUMN linkedTeacherId INTEGER");
+    }
+
+    // Migration: add two-factor auth columns to users if missing (admin TOTP)
+    if (!userColumns.includes("twoFactorEnabled")) {
+        db.exec("ALTER TABLE users ADD COLUMN twoFactorEnabled INTEGER DEFAULT 0");
+    }
+    if (!userColumns.includes("twoFactorSecret")) {
+        db.exec("ALTER TABLE users ADD COLUMN twoFactorSecret TEXT");
     }
 
     // Migration: drop coordinator column from classes (feature removed)

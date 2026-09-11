@@ -3,6 +3,47 @@ import bcrypt from 'bcryptjs';
 import db from '../db.js';
 import { generateToken, authMiddleware, requirePermission } from '../middleware/auth.js';
 import { defaultPasswordFor, generateUniqueUsername } from './defaults.js';
+import otplibPkg from 'otplib';
+import QRCode from 'qrcode';
+
+const authenticator = otplibPkg.authenticator || otplibPkg.default?.authenticator;
+const ISSUER = 'NCBA e-Student System';
+
+// Roles that are forced through two-factor authentication (TOTP). Students
+// keep the normal single-step login.
+const ADMIN_ROLES = ['super_admin', 'teacher_admin', 'cr_admin'];
+
+// Simple in-memory throttling for the 2FA endpoint. Serverless instances run
+// a short lifetime, so this is a best-effort brute-force guard (per instance),
+// not a replacement for a proper rate limiter on the edge.
+const twoFactorAttempts = new Map(); // key → { fails, blockedUntil }
+function twoFactorThrottled(key) {
+  const now = Date.now();
+  const rec = twoFactorAttempts.get(key);
+  if (rec && rec.blockedUntil > now) return { blocked: true, retryInMs: rec.blockedUntil - now };
+  if (rec && rec.fails >= 5) {
+    rec.blockedUntil = now + 60_000; // lock for 60s after 5 failed codes
+    rec.fails = 0;
+    return { blocked: true, retryInMs: rec.blockedUntil - now };
+  }
+  return { blocked: false };
+}
+function twoFactorRecordFailure(key) {
+  const rec = twoFactorAttempts.get(key) || { fails: 0, blockedUntil: 0 };
+  rec.fails += 1;
+  twoFactorAttempts.set(key, rec);
+}
+function twoFactorClearFailure(key) {
+  twoFactorAttempts.delete(key);
+}
+
+// Never leak the TOTP secret (or password hash) back to clients in normal
+// API responses. The raw secret IS returned once, during the QR setup step,
+// so admins can type it in manually if their camera fails.
+function toSafeUser(user) {
+  const { password, twoFactorSecret, ...safe } = user;
+  return safe;
+}
 
 const router = Router();
 
@@ -13,9 +54,83 @@ router.post('/login', async (req, res) => {
   if (!user) return res.status(401).json({ error: 'Invalid credentials' });
   if (!bcrypt.compareSync(password, user.password)) return res.status(401).json({ error: 'Invalid credentials' });
   if (user.status !== 'approved') return res.status(403).json({ error: 'Account pending approval' });
+
+  // ── Two-factor authentication ──────────────────────────────────────────
+  if (user.twoFactorEnabled) {
+    // 2FA already configured — refuse to issue a token until the OTP matches.
+    return res.json({ twoFactor: 'verify', username: user.username, fullName: user.fullName });
+  }
+
+  if (ADMIN_ROLES.includes(user.role)) {
+    // First-time admin login → generate (and persist) a TOTP secret, show the
+    // QR code, and only issue a token after the scanned code is verified.
+    let secret = user.twoFactorSecret;
+    if (!secret) {
+      secret = authenticator.generateSecret();
+      await db.run('UPDATE users SET twoFactorSecret = ? WHERE id = ?', [secret, user.id]);
+      user.twoFactorSecret = secret;
+    }
+    const otpauthUrl = authenticator.keyuri(user.username, ISSUER, secret);
+    const qrDataUrl = await QRCode.toDataURL(otpauthUrl, { width: 240, margin: 1, errorCorrectionLevel: 'M' });
+    return res.json({
+      twoFactor: 'setup',
+      username: user.username,
+      fullName: user.fullName,
+      secret,
+      otpauthUrl,
+      qrDataUrl,
+    });
+  }
+
+  // Regular (student) login — unchanged behaviour.
   const token = generateToken(user);
-  const { password: _, ...safe } = user;
-  res.json({ token, user: safe });
+  res.json({ token, user: toSafeUser(user) });
+});
+
+// POST /api/auth/2fa/verify
+// Verifies a TOTP code for an admin. Works for BOTH states:
+//   • twoFactorEnabled = 0 → first-time setup: activating 2FA
+//   • twoFactorEnabled = 1 → subsequent logins: entering the OTP
+// On success the normal session token is issued (same as a plain login).
+router.post('/2fa/verify', async (req, res) => {
+  const { username, otp } = req.body;
+  if (!username || !otp) return res.status(400).json({ error: 'Username and code required' });
+  const user = await db.get('SELECT * FROM users WHERE username = ? OR email = ?', [username, username]);
+  if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+  if (!user.twoFactorSecret) {
+    return res.status(400).json({ error: 'Two-factor authentication is not set up for this account' });
+  }
+
+  const throttle = twoFactorThrottled(String(user.id));
+  if (throttle.blocked) {
+    return res.status(429).json({ error: 'Too many failed attempts. Try again in a moment.' });
+  }
+
+  const code = String(otp).replace(/\s+/g, '');
+  if (!/^\d{6}$/.test(code)) {
+    return res.status(400).json({ error: 'Enter the 6-digit code shown in your authenticator app' });
+  }
+
+  let verified = false;
+  try {
+    verified = authenticator.verify({ token: code, secret: user.twoFactorSecret, window: 1 });
+  } catch { /* malformed secret → treated as invalid below */ }
+
+  if (!verified) {
+    twoFactorRecordFailure(String(user.id));
+    return res.status(401).json({ error: 'Incorrect code. Check your authenticator app and try again.' });
+  }
+
+  twoFactorClearFailure(String(user.id));
+
+  // First successful code → activate 2FA for this account.
+  const twoFactorJustSetup = !user.twoFactorEnabled;
+  if (twoFactorJustSetup) {
+    await db.run('UPDATE users SET twoFactorEnabled = 1 WHERE id = ?', [user.id]);
+  }
+
+  const token = generateToken(user);
+  res.json({ token, user: toSafeUser(user), twoFactorJustSetup });
 });
 
 router.post('/register', async (req, res) => {

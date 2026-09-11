@@ -97,6 +97,8 @@ const CAMEL_OVERRIDES = {
   crforclass: 'crForClass',
   manageallclasses: 'manageAllClasses',
   linkedteacherid: 'linkedTeacherId',
+  twofactorsecret: 'twoFactorSecret',
+  twofactorenabled: 'twoFactorEnabled',
   rollno: 'rollNo',
   dateofbirth: 'dateOfBirth',
   admissiondate: 'admissionDate',
@@ -284,7 +286,28 @@ export function transaction(fn) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Schema bootstrapping — applies supabase/schema.sql (idempotent)
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Migration for EXISTING deployments: PostgreSQL has no "ADD COLUMN IF NOT
+// EXISTS", so we inspect information_schema and add missing columns one at a
+// time. Runs unconditionally (regardless of SUPABASE_AUTO_MIGRATE) so a warm
+// instance that never runs the full schema still gets the new auth columns.
+async function ensureUserColumns() {
+  const cols = await all(
+    "SELECT column_name FROM information_schema.columns WHERE table_name = 'users'"
+  );
+  const names = new Set((cols || []).map(c => String(c.column_name || c).toLowerCase()));
+  if (!names.has('twofactorenabled')) {
+    await run('ALTER TABLE users ADD COLUMN twoFactorEnabled INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!names.has('twofactorsecret')) {
+    await run('ALTER TABLE users ADD COLUMN twoFactorSecret TEXT');
+  }
+}
+
 export async function initDatabase() {
+  // Keep schema.sql the source of truth for fresh installs, but guarantee the
+  // 2FA columns exist on existing DBs even when auto-migrate is disabled.
+  await ensureUserColumns();
   // Recommended: run supabase/schema.sql once in the Supabase SQL Editor.
   // For auto-migrate on boot, set SUPABASE_AUTO_MIGRATE=1.
   if (process.env.SUPABASE_AUTO_MIGRATE !== '1') {

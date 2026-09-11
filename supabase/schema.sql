@@ -45,7 +45,9 @@ CREATE TABLE IF NOT EXISTS users (
   linkedStudentId   BIGINT,
   crForClass        TEXT,
   manageAllClasses  INTEGER NOT NULL DEFAULT 0,
-  linkedTeacherId   BIGINT            -- added by migration in SQLite (login → teachers)
+  linkedTeacherId   BIGINT,           -- added by migration in SQLite (login → teachers)
+  twoFactorSecret   TEXT,             -- TOTP secret (Google/MS Authenticator); NULL until setup
+  twoFactorEnabled  INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_users_role ON users (role);
 

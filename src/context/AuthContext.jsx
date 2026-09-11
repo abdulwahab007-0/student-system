@@ -138,19 +138,49 @@ export function AuthProvider({ children }) {
         } catch {}
     };
 
+    // Shared post-auth path: store credentials, refresh users/permissions, toast.
+    const finalizeLogin = async (token, user) => {
+        api.setToken(token);
+        setCurrentUser(user);
+        localStorage.setItem("ncba_current_user", JSON.stringify(user));
+        showToast(`Welcome back, ${user.fullName}!`, "success");
+        await loadBootstrap();
+    };
+
     const login = async (username, password) => {
         try {
-            const { token, user } = await api.login(username, password);
-            api.setToken(token);
-            setCurrentUser(user);
-            localStorage.setItem("ncba_current_user", JSON.stringify(user));
-            showToast(`Welcome back, ${user.fullName}!`, "success");
-            await loadBootstrap();
-            return { success: true, user };
+            const res = await api.login(username, password);
+            // Two-factor step needed → hand control to the Login page (setup QR
+            // flow for admins on first login, or OTP entry for existing setups).
+            if (res.twoFactor) {
+                return {
+                    success: false,
+                    twoFactor: res.twoFactor, // 'setup' | 'verify'
+                    username: res.username,
+                    fullName: res.fullName,
+                    secret: res.secret,
+                    otpauthUrl: res.otpauthUrl,
+                    qrDataUrl: res.qrDataUrl,
+                };
+            }
+            await finalizeLogin(res.token, res.user);
+            return { success: true, user: res.user };
         } catch (err) {
             const msg = err.message || "";
             if (msg.includes("pending")) return { success: false, message: "Your registration is still pending approval." };
             return { success: false, message: msg || "Invalid username/email or password." };
+        }
+    };
+
+    // Verifies the TOTP from Google / Microsoft Authenticator and completes the
+    // login. Used both for first-time setup and for every subsequent admin login.
+    const complete2FA = async (username, otp) => {
+        try {
+            const res = await api.verify2FA(username, otp);
+            await finalizeLogin(res.token, res.user);
+            return { success: true, user: res.user, twoFactorJustSetup: res.twoFactorJustSetup };
+        } catch (err) {
+            return { success: false, message: err.message || "Could not verify the code." };
         }
     };
 
@@ -392,7 +422,7 @@ export function AuthProvider({ children }) {
 
     const value = {
         currentUser, users, pendingUsers,
-        login, logout, register, changePassword,
+        login, logout, register, changePassword, complete2FA,
         assignCR, removeCR, createAccount, resetPassword,
         defaultPasswordFor, approveUser, rejectUser,
         isAdmin, canManageStudents, canApproveUsers, isSuperAdmin,

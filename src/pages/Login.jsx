@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -55,6 +55,27 @@ const MoonIcon = () => (
   </svg>
 );
 
+const ShieldIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <path d="M9 12l2 2 4-4" />
+  </svg>
+);
+
+const CopyIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+);
+
+const PhoneIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+    <line x1="12" y1="18" x2="12.01" y2="18" />
+  </svg>
+);
+
 const GoogleIcon = () => (
   <svg width="20" height="20" viewBox="0 0 48 48">
     <path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.1 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z" />
@@ -77,7 +98,7 @@ const FacebookIcon = () => (
 );
 
 function Login() {
-  const { login } = useAuth();
+  const { login, complete2FA } = useAuth();
   const { darkMode, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
@@ -87,6 +108,23 @@ function Login() {
   const [info, setInfo] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Two-factor authentication flow state
+  const [twoFactorMode, setTwoFactorMode] = useState(null); // null | 'setup' | 'verify'
+  const [tfUsername, setTfUsername] = useState('');
+  const [tfFullName, setTfFullName] = useState('');
+  const [tfSecret, setTfSecret] = useState('');
+  const [tfQrUrl, setTfQrUrl] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const otpRef = useRef(null);
+
+  useEffect(() => {
+    if (twoFactorMode && otpRef.current) otpRef.current.focus();
+  }, [twoFactorMode]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -98,12 +136,87 @@ function Login() {
       const result = await login(username, password);
       if (result.success) {
         navigate('/');
+      } else if (result.twoFactor) {
+        setTwoFactorMode(result.twoFactor);
+        setTfUsername(result.username);
+        setTfFullName(result.fullName || result.username);
+        setTfSecret(result.secret || '');
+        setTfQrUrl(result.qrDataUrl || '');
+        setOtp('');
+        setOtpError('');
       } else {
         setError(result.message);
       }
       setLoading(false);
     }, 500);
   };
+
+  const handleVerifyOtp = async (e) => {
+    if (e) e.preventDefault();
+    const code = otp.replace(/\s+/g, '');
+    if (!/^\d{6}$/.test(code)) {
+      setOtpError('Please enter the full 6-digit code.');
+      return;
+    }
+    setOtpError('');
+    setOtpLoading(true);
+    const result = await complete2FA(tfUsername, code);
+    if (result.success) {
+      navigate('/');
+    } else {
+      setOtpError(result.message);
+      setOtp('');
+      if (otpRef.current) otpRef.current.focus();
+    }
+    setOtpLoading(false);
+  };
+
+  const handleOtpChange = (e) => {
+    const raw = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setOtp(raw);
+    if (raw.length === 6) {
+      // Auto-submit once the full code is entered — same as the server expects.
+      e.target.form?.requestSubmit?.();
+    }
+  };
+
+  const copySecret = () => {
+    try {
+      navigator.clipboard.writeText(tfSecret).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+      }).catch(() => {});
+    } catch { /* clipboard unavailable — manual entry only */ }
+  };
+
+  const resetToLogin = () => {
+    setTwoFactorMode(null);
+    setOtp('');
+    setOtpError('');
+    setShowSecret(false);
+  };
+
+  const renderOtpField = (label) => (
+    <div className="auth-field">
+      <label>{label}</label>
+      <div className="auth-input-wrap">
+        <span className="auth-input-icon"><ShieldIcon /></span>
+        <input
+          ref={otpRef}
+          type="text"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          className="auth-input auth-otp-input"
+          placeholder="••••••"
+          value={otp}
+          onChange={handleOtpChange}
+          maxLength={6}
+          disabled={otpLoading}
+          required
+        />
+      </div>
+    </div>
+  );
 
   return (
     <div className="auth-container">
@@ -134,10 +247,99 @@ function Login() {
           <p>Student Management System</p>
         </div>
 
-        <div className="auth-heading">
-          <h2>Welcome back</h2>
-          <p>Sign in to continue to your dashboard</p>
-        </div>
+        {twoFactorMode === 'setup' ? (
+          <div className="auth-2fa">
+            <div className="auth-heading">
+              <h2>Secure your account</h2>
+              <p>Two-factor authentication setup</p>
+            </div>
+
+            {otpError && (
+              <div className="auth-error" style={{ marginBottom: '16px' }}>
+                ⚠️ {otpError}
+              </div>
+            )}
+
+            <form className="auth-form" onSubmit={handleVerifyOtp}>
+              <p className="auth-2fa-intro">
+                Hi <strong>{tfFullName}</strong>! For security, admin accounts require a one-time
+                password. Install <strong>Google Authenticator</strong> or{' '}
+                <strong>Microsoft Authenticator</strong> on your phone and scan this code.
+              </p>
+
+              <div className="auth-qr">
+                {tfQrUrl ? <img src={tfQrUrl} alt="Authenticator QR code" width="220" height="220" /> : (
+                  <div className="auth-qr-placeholder">QR code unavailable — use the manual code below.</div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                className="auth-secret-toggle"
+                onClick={() => setShowSecret(v => !v)}
+              >
+                {showSecret ? 'Hide manual code' : "Can't scan? Enter the code manually"}
+              </button>
+
+              {showSecret && (
+                <div className="auth-secret">
+                  <code>{tfSecret}</code>
+                  <button type="button" className="auth-secret-copy" onClick={copySecret}>
+                    {copied ? 'Copied!' : <><CopyIcon /> Copy</>}
+                  </button>
+                </div>
+              )}
+
+              {renderOtpField('Enter the 6-digit code from your app')}
+
+              <button type="submit" className="auth-btn" disabled={otpLoading || otp.length !== 6}>
+                {otpLoading ? 'Verifying…' : 'Verify & Activate'}
+              </button>
+
+              <p className="auth-2fa-apps">
+                <PhoneIcon /> Works with Google Authenticator, Microsoft Authenticator &amp; Authy
+              </p>
+            </form>
+
+            <div className="auth-footer">
+              <a onClick={resetToLogin}>&larr; Back to sign in</a>
+            </div>
+          </div>
+        ) : twoFactorMode === 'verify' ? (
+          <div className="auth-2fa">
+            <div className="auth-heading">
+              <h2>Two-step verification</h2>
+              <p>{tfFullName || 'You'} need the code from your authenticator app</p>
+            </div>
+
+            {otpError && (
+              <div className="auth-error" style={{ marginBottom: '16px' }}>
+                ⚠️ {otpError}
+              </div>
+            )}
+
+            <form className="auth-form" onSubmit={handleVerifyOtp}>
+              {renderOtpField('6-digit authentication code')}
+
+              <button type="submit" className="auth-btn" disabled={otpLoading || otp.length !== 6}>
+                {otpLoading ? 'Verifying…' : 'Verify & Sign In'}
+              </button>
+
+              <p className="auth-2fa-apps">
+                <PhoneIcon /> Open your authenticator app to view the current code
+              </p>
+            </form>
+
+            <div className="auth-footer">
+              <a onClick={resetToLogin}>&larr; Back to sign in</a>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="auth-heading">
+              <h2>Welcome back</h2>
+              <p>Sign in to continue to your dashboard</p>
+            </div>
 
         {error && (
           <div className="auth-error" style={{ marginBottom: '16px' }}>
@@ -234,6 +436,8 @@ function Login() {
           Don&apos;t have an account?{' '}
           <a onClick={() => navigate('/register')}>Sign up</a>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

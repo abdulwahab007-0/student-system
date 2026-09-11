@@ -3385,6 +3385,133 @@ input, select, textarea {
   font-weight: 500;
 }
 
+/* ── Two-factor authentication (TOTP) ─────────────────────────────────── */
+.auth-2fa .auth-form {
+  gap: 14px;
+}
+
+.auth-2fa-intro {
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--auth-subtitle);
+  margin: 0;
+}
+
+.auth-2fa-intro strong {
+  color: var(--auth-label);
+}
+
+.auth-qr {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  background: #ffffff;
+  border: 1px solid var(--auth-input-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px -14px rgba(15, 23, 42, 0.35);
+}
+
+.auth-qr img {
+  display: block;
+  border-radius: 8px;
+  max-width: 100%;
+  height: auto;
+}
+
+.auth-qr-placeholder {
+  padding: 32px 16px;
+  font-size: 0.8rem;
+  color: var(--auth-subtitle);
+  text-align: center;
+}
+
+.auth-secret-toggle {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.auth-secret-toggle:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.auth-secret {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--auth-input-border);
+  background: var(--auth-input-bg);
+  border-radius: 12px;
+  font-size: 0.88rem;
+  letter-spacing: 1.5px;
+  color: var(--auth-input-text);
+}
+
+.auth-secret code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  word-break: break-all;
+  flex: 1;
+}
+
+.auth-secret-copy {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--auth-input-border);
+  background: var(--auth-card-bg);
+  color: var(--auth-label);
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 9px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.auth-secret-copy:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.auth-otp-input {
+  text-align: center;
+  font-size: 1.35rem !important;
+  letter-spacing: 12px;
+  font-weight: 700;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  caret-color: var(--primary);
+}
+
+.auth-otp-input::placeholder {
+  letter-spacing: 12px;
+}
+
+.auth-2fa-apps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: var(--auth-subtitle);
+  margin: 0;
+}
+
+.auth-2fa-apps svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
 /* Role badges */
 .role-badge-admin,
 .role-badge-cr,

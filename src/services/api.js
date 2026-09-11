@@ -142,6 +142,7 @@ function invalidateSwr(...pathPatterns) {
 const api = {
   // Auth
   login: (username, password) => request('POST', '/auth/login', { username, password }),
+  verify2FA: (username, otp) => request('POST', '/auth/2fa/verify', { username, otp }),
   register: (data) => request('POST', '/auth/register', data),
   changePassword: (userId, oldPassword, newPassword) =>
     request('PUT', '/auth/change-password', { userId, oldPassword, newPassword }),
