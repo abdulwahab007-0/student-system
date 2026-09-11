@@ -212,22 +212,7 @@ function Layout() {
             <button
               onClick={toggleTheme}
               title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '38px',
-                height: '38px',
-                borderRadius: '10px',
-                border: '1px solid var(--border)',
-                background: 'var(--white)',
-                color: 'var(--dark)',
-                fontSize: '1.15rem',
-                cursor: 'pointer',
-                transition: 'all 0.25s ease',
-                marginRight: '12px',
-                boxShadow: 'var(--shadow-sm)',
-              }}
+              className="topbar-theme-toggle"
             >
               {darkMode ? <Icon name="sun" size={18} /> : <Icon name="moon" size={18} />}
             </button>
