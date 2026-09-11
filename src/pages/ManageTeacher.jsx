@@ -16,7 +16,7 @@ function getInitials(name) {
 }
 
 function ManageTeacher() {
-  const { getTeacherAccounts, grantTeacherAccount, resetPassword, reset2FA, revokeAccount } = useAuth();
+  const { getTeacherAccounts, grantTeacherAccount, resetPassword, reset2FA, revokeAccount, hasPermission } = useAuth();
   const showToast = useToast();
 
   const [teachers, setTeachers] = useState([]);
@@ -210,14 +210,16 @@ function ManageTeacher() {
                     {t.account
                       ? <span className="role-pill role-badge-teacher">Teacher Admin</span>
                       : <span className="role-pill role-badge-student">No Account</span>}
-                    {t.account && (
+                    {hasPermission('view_2fa_status') && t.account && (
                       <span
                         className="role-pill"
                         style={t.account.twoFactorEnabled
-                          ? { background: 'var(--success-bg)', color: 'var(--success)' }
+                          ? t.account.twoFactorSetUp
+                            ? { background: 'var(--success-bg)', color: 'var(--success)' }
+                            : { background: 'var(--warning-bg)', color: 'var(--warning)' }
                           : { background: 'var(--secondary-bg)', color: 'var(--gray)' }}
                       >
-                        {t.account.twoFactorEnabled ? '2FA On' : '2FA Off'}
+                        {t.account.twoFactorEnabled ? (t.account.twoFactorSetUp ? '2FA On' : '2FA Required') : '2FA Off'}
                       </span>
                     )}
                   </div>
@@ -241,6 +243,7 @@ function ManageTeacher() {
                     <button className="btn btn-secondary btn-sm" onClick={() => handleReset(t)}>
                       <Icon name="key" size={14} /> Reset Password
                     </button>
+                    {hasPermission('reset_2fa') && (
                     <button
                       className="btn btn-secondary btn-sm"
                       disabled={!t.account.twoFactorEnabled}
@@ -251,6 +254,7 @@ function ManageTeacher() {
                     >
                       <Icon name="key" size={14} /> Reset 2FA
                     </button>
+                    )}
                     <button className="btn btn-danger btn-sm" onClick={() => setRevokeTarget(t)}>
                       <Icon name="delete" size={14} /> Revoke
                     </button>

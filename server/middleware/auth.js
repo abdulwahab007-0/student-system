@@ -33,6 +33,8 @@ const DEFAULT_RIGHTS = {
   approve_users: ['super_admin', 'cr_admin', 'teacher_admin'],
   view_users: ['super_admin', 'cr_admin', 'teacher_admin'],
   reset_passwords: ['super_admin'],
+  view_2fa_status: ['super_admin', 'cr_admin', 'teacher_admin'],
+  manage_2fa: ['super_admin'],
   reset_2fa: ['super_admin'],
   create_accounts: ['super_admin', 'cr_admin', 'teacher_admin'],
   remove_users: ['super_admin'],

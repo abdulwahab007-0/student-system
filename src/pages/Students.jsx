@@ -171,7 +171,7 @@ function StudentForm({ student, onSave, onCancel, classSuggestions }) {
   );
 }
 
-function StudentDetails({ student, onClose, onEdit }) {
+function StudentDetails({ student, onClose, onEdit, account, canView2FA }) {
   const color = getAvatarColor(student.name);
   return (
     <Modal
@@ -230,6 +230,26 @@ function StudentDetails({ student, onClose, onEdit }) {
           <span className="label">Address</span>
           <span className="value">{student.address || '—'}</span>
         </div>
+        {canView2FA && (
+          <div className="detail-item">
+            <span className="label">2-Factor Auth</span>
+            <span className="value">
+              {account ? (
+                account.twoFactorEnabled ? (
+                  account.twoFactorSetUp ? (
+                    <span className="badge success">2FA On</span>
+                  ) : (
+                    <span className="badge warning">2FA Required — not set up</span>
+                  )
+                ) : (
+                  <span className="badge info">2FA Off</span>
+                )
+              ) : (
+                <span style={{ color: 'var(--gray)', fontStyle: 'italic' }}>No login account</span>
+              )}
+            </span>
+          </div>
+        )}
       </div>
     </Modal>
   );
@@ -237,7 +257,7 @@ function StudentDetails({ student, onClose, onEdit }) {
 
 function Students() {
   const { students, teachers, subjects, classes, addStudent, updateStudent, deleteStudent, bulkDeleteStudents, marks, resetData } = useData();
-  const { currentUser, canManageStudents, users, createAccount, resetPassword, defaultPasswordFor, hasPermission } = useAuth();
+  const { currentUser, canManageStudents, users, createAccount, resetPassword, defaultPasswordFor, reset2FA, enable2FA, hasPermission } = useAuth();
   const showToast = useToast();
   const [search, setSearch] = useState('');
   const [filterClass, setFilterClass] = useState('');
@@ -248,6 +268,8 @@ function Students() {
   const [deletingStudent, setDeletingStudent] = useState(null);
   const [createdAccount, setCreatedAccount] = useState(null); // credentials for newly added student
   const [resettingStudent, setResettingStudent] = useState(null); // student whose password will be reset
+  const [twoFAResetTarget, setTwoFAResetTarget] = useState(null); // student whose 2FA will be reset
+  const [twoFAEnableTarget, setTwoFAEnableTarget] = useState(null); // student whose 2FA will be required
   const [selectedIds, setSelectedIds] = useState([]);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
@@ -322,6 +344,40 @@ function Students() {
       showToast(`Password reset to default for ${resettingStudent.name}.`, 'info');
     }
     setResettingStudent(null);
+  };
+
+  const handleResetTwoFA = async () => {
+    if (!twoFAResetTarget) return;
+    const account = findStudentAccount(twoFAResetTarget);
+    if (!account) {
+      showToast('No login account found for this student.', 'warning');
+      setTwoFAResetTarget(null);
+      return;
+    }
+    const result = await reset2FA(account.id);
+    if (result.success) {
+      showToast(`Two-factor authentication reset for ${twoFAResetTarget.name}. They will re-set it up at their next login.`, 'success');
+    } else {
+      showToast(result.message || 'Could not reset 2FA.', 'error');
+    }
+    setTwoFAResetTarget(null);
+  };
+
+  const handleEnableTwoFA = async () => {
+    if (!twoFAEnableTarget) return;
+    const account = findStudentAccount(twoFAEnableTarget);
+    if (!account) {
+      showToast('No login account found for this student.', 'warning');
+      setTwoFAEnableTarget(null);
+      return;
+    }
+    const result = await enable2FA(account.id);
+    if (result.success) {
+      showToast(`Two-factor authentication is now required for ${twoFAEnableTarget.name}.`, 'success');
+    } else {
+      showToast(result.message || 'Could not enable 2FA.', 'error');
+    }
+    setTwoFAEnableTarget(null);
   };
 
   const handleEdit = (student) => {
@@ -451,12 +507,16 @@ function Students() {
                     <th>Phone</th>
                     <th>Avg Score</th>
                     <th>Status</th>
+                    {hasPermission('view_2fa_status') && (
+                      <th style={{ textAlign: 'center' }}>2FA</th>
+                    )}
                     <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredStudents.map(student => {
                     const avg = getStudentAverage(student.id);
+                    const account = findStudentAccount(student);
                     return (
                       <tr key={student.id} style={selectedIds.includes(student.id) ? { background: 'var(--danger-bg, #fef2f2)' } : undefined}>
                         {hasPermission('delete_students') && (
@@ -486,10 +546,9 @@ function Students() {
                                   </span>
                                 )}
                                 {(() => {
-                                  const acc = findStudentAccount(student);
-                                  return acc ? (
+                                  return account ? (
                                     <span
-                                      title={`Portal login: ${acc.username}${acc.email ? ` (${acc.email})` : ''}`}
+                                      title={`Portal login: ${account.username}${account.email ? ` (${account.email})` : ''}`}
                                       style={{
                                         marginLeft: '8px', fontSize: '0.6rem', fontWeight: '600',
                                         padding: '2px 8px', borderRadius: '12px',
@@ -538,6 +597,66 @@ function Students() {
                             {student.status}
                           </span>
                         </td>
+                        {hasPermission('view_2fa_status') && (
+                          <td style={{ textAlign: 'center' }}>
+                            {account ? (
+                              account.twoFactorEnabled ? (
+                                <span
+                                  className={`badge ${account.twoFactorSetUp ? 'success' : 'warning'}`}
+                                  style={{ fontSize: '0.66rem', padding: '2px 8px' }}
+                                  title={account.twoFactorSetUp
+                                    ? 'Two-factor authentication is active for this student\u2019s login'
+                                    : '2FA is required — will be activated at this student\u2019s next login'}
+                                >
+                                  {account.twoFactorSetUp ? '2FA On' : '2FA Req.'}
+                                </span>
+                              ) : (
+                                <span
+                                  className="badge info"
+                                  style={{ fontSize: '0.66rem', padding: '2px 8px' }}
+                                  title="Two-factor authentication is not active for this student\u2019s login"
+                                >
+                                  2FA Off
+                                </span>
+                              )
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: '0.66rem', fontWeight: '600', padding: '2px 8px', borderRadius: '12px',
+                                  background: 'var(--light-gray)', color: 'var(--gray)',
+                                  border: '1px solid var(--border)', cursor: 'help', whiteSpace: 'nowrap',
+                                }}
+                                title="No student portal login linked yet"
+                              >
+                                No login
+                              </span>
+                            )}
+                            {hasPermission('manage_2fa') && account && !account.twoFactorEnabled && (
+                              <div style={{ marginTop: '6px' }}>
+                                <button
+                                  className="btn btn-secondary btn-sm"
+                                  style={{ fontSize: '0.62rem', padding: '2px 8px', fontWeight: '600' }}
+                                  title="Require this student to set up two-factor authentication at their next login"
+                                  onClick={() => setTwoFAEnableTarget(student)}
+                                >
+                                  🛡️ Require 2FA
+                                </button>
+                              </div>
+                            )}
+                            {hasPermission('reset_2fa') && account && account.twoFactorEnabled && (
+                              <div style={{ marginTop: '6px' }}>
+                                <button
+                                  className="btn btn-secondary btn-sm"
+                                  style={{ fontSize: '0.62rem', padding: '2px 8px', fontWeight: '600' }}
+                                  title="Reset this student\u2019s two-factor authentication so they can set it up again"
+                                  onClick={() => setTwoFAResetTarget(student)}
+                                >
+                                  🛡️ Reset 2FA
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        )}
                         <td>
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                             <button className="btn-icon view" title="View" onClick={() => setViewingStudent(student)}><Icon name="view" size={16} /></button>
@@ -586,6 +705,8 @@ function Students() {
           student={viewingStudent}
           onClose={() => setViewingStudent(null)}
           onEdit={handleEdit}
+          account={findStudentAccount(viewingStudent)}
+          canView2FA={hasPermission('view_2fa_status')}
         />
       )}
 
@@ -604,6 +725,24 @@ function Students() {
           message={`Are you sure you want to delete ${selectedIds.length} selected student${selectedIds.length !== 1 ? 's' : ''}? This will also remove their marks records. This action cannot be undone.`}
           onConfirm={handleBulkDelete}
           onCancel={() => setShowBulkDeleteConfirm(false)}
+        />
+      )}
+
+      {/* Require 2FA confirmation */}
+      {twoFAEnableTarget && (
+        <ConfirmDialog
+          message={`Require two-factor authentication for ${twoFAEnableTarget.name}? At their next login they will be asked to scan a QR code with an authenticator app before they can sign in.`}
+          onConfirm={handleEnableTwoFA}
+          onCancel={() => setTwoFAEnableTarget(null)}
+        />
+      )}
+
+      {/* Reset 2FA confirmation */}
+      {twoFAResetTarget && (
+        <ConfirmDialog
+          message={`Reset two-factor authentication for ${twoFAResetTarget.name}? Their authenticator app will be unlinked and they will be asked to scan a new QR code at their next login.`}
+          onConfirm={handleResetTwoFA}
+          onCancel={() => setTwoFAResetTarget(null)}
         />
       )}
 

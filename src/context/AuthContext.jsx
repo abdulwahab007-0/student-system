@@ -28,6 +28,8 @@ const DEFAULT_PERMISSIONS = {
     approve_users: ["super_admin", "cr_admin", "teacher_admin"],
     view_users: ["super_admin", "cr_admin", "teacher_admin"],
     reset_passwords: ["super_admin"],
+    view_2fa_status: ["super_admin", "cr_admin", "teacher_admin"],
+    manage_2fa: ["super_admin"],
     reset_2fa: ["super_admin"],
     create_accounts: ["super_admin", "cr_admin", "teacher_admin"],
     remove_users: ["super_admin"],
@@ -236,6 +238,20 @@ export function AuthProvider({ children }) {
         }
     };
 
+    // Turns on the 2FA requirement for a user (admins, teachers and students).
+    // On their next login the app generates a TOTP secret and walks them through
+    // scanning the QR code. Gated by the 'manage_2fa' right.
+    const enable2FA = async (userId) => {
+        try {
+            const result = await api.enable2FA(userId);
+            await refreshUsers();
+            showToast(`${result.user.fullName} is now required to use two-factor authentication.`, "info");
+            return { success: true, user: result.user };
+        } catch (err) {
+            return { success: false, message: err.message };
+        }
+    };
+
     const createAccount = async (data) => {
         try {
             const result = await api.createAccount(data);
@@ -436,7 +452,7 @@ export function AuthProvider({ children }) {
     const value = {
         currentUser, users, pendingUsers,
         login, logout, register, changePassword, complete2FA,
-        assignCR, removeCR, createAccount, resetPassword, reset2FA,
+        assignCR, removeCR, createAccount, resetPassword, reset2FA, enable2FA,
         defaultPasswordFor, approveUser, rejectUser,
         isAdmin, canManageStudents, canApproveUsers, isSuperAdmin,
         roleLabel, rolePermissions, roleHasRight, hasPermission,

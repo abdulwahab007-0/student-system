@@ -15,13 +15,14 @@ function getInitials(name) {
 }
 
 function ManageUsers() {
-  const { users, currentUser, resetPassword, reset2FA, refreshUsers, roleLabel, hasPermission, removeUser } = useAuth();
+  const { users, currentUser, resetPassword, reset2FA, enable2FA, refreshUsers, roleLabel, hasPermission, removeUser } = useAuth();
   const showToast = useToast();
 
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [resetTarget, setResetTarget] = useState(null);
   const [twoFATarget, setTwoFATarget] = useState(null);
+  const [requireTarget, setRequireTarget] = useState(null);
   const [newCredentials, setNewCredentials] = useState(null);
   const [copied, setCopied] = useState(false);
   const [selected, setSelected] = useState([]);
@@ -48,8 +49,6 @@ function ManageUsers() {
   };
 
   const roles = ['super_admin', 'cr_admin', 'teacher_admin', 'student'];
-  // Only admin-role logins are forced through TOTP 2FA, so 2FA actions only apply to them.
-  const adminRole = (role) => ['super_admin', 'cr_admin', 'teacher_admin'].includes(role);
 
   const filteredUsers = users.filter(u => {
     const matchesSearch = !search ||
@@ -89,6 +88,17 @@ function ManageUsers() {
       showToast(result.message || 'Could not reset 2FA.', 'error');
     }
     setTwoFATarget(null);
+  };
+
+  const handleEnable2FA = async () => {
+    if (!requireTarget) return;
+    const result = await enable2FA(requireTarget.id);
+    if (result.success) {
+      refreshUsers(); // flip the 2FA badge to Required right away
+    } else {
+      showToast(result.message || 'Could not enable 2FA.', 'error');
+    }
+    setRequireTarget(null);
   };
 
   const copyCredentials = () => {
@@ -279,15 +289,17 @@ function ManageUsers() {
                       >
                         {roleLabel(user.role)}
                       </span>
-                      {adminRole(user.role) && (
+                      {hasPermission('view_2fa_status') && (
                         <span
-                          className={`badge ${user.twoFactorEnabled ? 'success' : 'info'}`}
+                          className={`badge ${user.twoFactorEnabled ? (user.twoFactorSetUp ? 'success' : 'warning') : 'info'}`}
                           style={{ marginLeft: '6px', fontSize: '0.62rem', padding: '2px 8px', verticalAlign: 'middle' }}
                           title={user.twoFactorEnabled
-                            ? 'Two-factor authentication (TOTP) is active for this login'
+                            ? user.twoFactorSetUp
+                              ? 'Two-factor authentication (TOTP) is active for this login'
+                              : "2FA is REQUIRED and will be activated at this user's next login"
                             : 'Two-factor authentication is not active for this login'}
                         >
-                          {user.twoFactorEnabled ? '2FA On' : '2FA Off'}
+                          {user.twoFactorEnabled ? (user.twoFactorSetUp ? '2FA On' : '2FA Req.') : '2FA Off'}
                         </span>
                       )}
                       {currentUser?.id === user.id && (
@@ -311,7 +323,7 @@ function ManageUsers() {
                   🔑 Reset
                 </button>
                 )}
-                {hasPermission('reset_2fa') && adminRole(user.role) && (
+                {hasPermission('reset_2fa') && (
                 <button
                   className="btn btn-secondary btn-sm"
                   disabled={!user.twoFactorEnabled}
@@ -321,6 +333,15 @@ function ManageUsers() {
                   onClick={() => setTwoFATarget(user)}
                 >
                   🛡️ Reset 2FA
+                </button>
+                )}
+                {hasPermission('manage_2fa') && user.role === 'student' && !user.twoFactorEnabled && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  title="Require this user to set up two-factor authentication at their next login"
+                  onClick={() => setRequireTarget(user)}
+                >
+                  🛡️ Require 2FA
                 </button>
                 )}
                 {hasPermission('remove_users') && removable(user) && (
@@ -360,6 +381,15 @@ function ManageUsers() {
           message={`Reset two-factor authentication for ${twoFATarget.fullName} (@${twoFATarget.username})? Their authenticator app will be unlinked and they will be asked to scan a new QR code at their next login.`}
           onConfirm={handleReset2FA}
           onCancel={() => setTwoFATarget(null)}
+        />
+      )}
+
+      {/* Require 2FA confirmation */}
+      {requireTarget && (
+        <ConfirmDialog
+          message={`Require two-factor authentication for ${requireTarget.fullName} (@${requireTarget.username})? At their next login they will be asked to scan a QR code with an authenticator app before they can sign in.`}
+          onConfirm={handleEnable2FA}
+          onCancel={() => setRequireTarget(null)}
         />
       )}
 

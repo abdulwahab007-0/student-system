@@ -15,7 +15,7 @@ function getInitials(name) {
 }
 
 function ManageSystemAdmin() {
-  const { getAdminAccounts, createAdminAccount, resetPassword, reset2FA, revokeAccount, currentUser } = useAuth();
+  const { getAdminAccounts, createAdminAccount, resetPassword, reset2FA, enable2FA, revokeAccount, currentUser, hasPermission } = useAuth();
   const showToast = useToast();
 
   const [admins, setAdmins] = useState([]);
@@ -27,6 +27,7 @@ function ManageSystemAdmin() {
   const [copied, setCopied] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState(null);
   const [twoFATarget, setTwoFATarget] = useState(null);
+  const [requireTarget, setRequireTarget] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -128,6 +129,17 @@ function ManageSystemAdmin() {
     setTwoFATarget(null);
   };
 
+  const handleEnable2FA = async () => {
+    if (!requireTarget) return;
+    const result = await enable2FA(requireTarget.id);
+    if (result.success) {
+      await load();
+    } else {
+      showToast(result.message || 'Could not enable 2FA.', 'error');
+    }
+    setRequireTarget(null);
+  };
+
   return (
     <div>
       <div className="page-header">
@@ -195,14 +207,18 @@ function ManageSystemAdmin() {
                       {a.username === 'admin' && (
                         <span className="role-pill" style={{ background: 'var(--warning-bg)', color: 'var(--warning)' }}>Primary</span>
                       )}
+                      {hasPermission('view_2fa_status') && (
                       <span
                         className="role-pill"
                         style={a.twoFactorEnabled
-                          ? { background: 'var(--success-bg)', color: 'var(--success)' }
+                          ? a.twoFactorSetUp
+                            ? { background: 'var(--success-bg)', color: 'var(--success)' }
+                            : { background: 'var(--warning-bg)', color: 'var(--warning)' }
                           : { background: 'var(--secondary-bg)', color: 'var(--gray)' }}
                       >
-                        {a.twoFactorEnabled ? '2FA On' : '2FA Off'}
+                        {a.twoFactorEnabled ? (a.twoFactorSetUp ? '2FA On' : '2FA Required') : '2FA Off'}
                       </span>
+                    )}
                     </div>
                     <div className="account-card-sub">@{a.username}</div>
                     <div className="account-card-meta">
@@ -214,6 +230,7 @@ function ManageSystemAdmin() {
                   <button className="btn btn-secondary btn-sm" onClick={() => handleReset(a)}>
                     <Icon name="key" size={14} /> Reset Password
                   </button>
+                  {hasPermission('reset_2fa') && (
                   <button
                     className="btn btn-secondary btn-sm"
                     disabled={!a.twoFactorEnabled}
@@ -224,6 +241,7 @@ function ManageSystemAdmin() {
                   >
                     <Icon name="key" size={14} /> Reset 2FA
                   </button>
+                )}
                   <button
                     className="btn btn-danger btn-sm"
                     disabled={protectedItem}

@@ -20,7 +20,7 @@ async function syncStudentLink(db, studentId, userId) {
 
 // GET /api/users - all users
 router.get('/', async (req, res) => {
-  const users = await db.all('SELECT id,username,email,fullName,role,status,className,registrationDate,linkedStudentId,crForClass,manageAllClasses,twoFactorEnabled FROM users ORDER BY id');
+  const users = await db.all('SELECT id,username,email,fullName,role,status,className,registrationDate,linkedStudentId,crForClass,manageAllClasses,twoFactorEnabled,(CASE WHEN twoFactorSecret IS NULL THEN 0 ELSE 1 END) AS twoFactorSetUp FROM users ORDER BY id');
   res.json(users);
 });
 
@@ -102,7 +102,7 @@ router.post('/create-account', async (req, res) => {
 // GET /api/users/teacher-accounts - list teachers with their linked account status
 router.get('/teacher-accounts', async (req, res) => {
   const teachers = await db.all('SELECT * FROM teachers ORDER BY id');
-  const users = await db.all("SELECT id,username,email,fullName,role,status,className,registrationDate,linkedStudentId,linkedTeacherId,twoFactorEnabled FROM users WHERE status = 'approved'");
+  const users = await db.all("SELECT id,username,email,fullName,role,status,className,registrationDate,linkedStudentId,linkedTeacherId,twoFactorEnabled,(CASE WHEN twoFactorSecret IS NULL THEN 0 ELSE 1 END) AS twoFactorSetUp FROM users WHERE status = 'approved'");
   const result = teachers.map(t => {
     const acc = users.find(u =>
       (u.linkedTeacherId && u.linkedTeacherId === t.id) ||
@@ -112,7 +112,7 @@ router.get('/teacher-accounts', async (req, res) => {
     return {
       ...t,
       account: acc
-        ? { id: acc.id, username: acc.username, email: acc.email, role: acc.role, status: acc.status, registrationDate: acc.registrationDate, twoFactorEnabled: acc.twoFactorEnabled }
+        ? { id: acc.id, username: acc.username, email: acc.email, role: acc.role, status: acc.status, registrationDate: acc.registrationDate, twoFactorEnabled: acc.twoFactorEnabled, twoFactorSetUp: acc.twoFactorSetUp }
         : null,
     };
   });
@@ -121,7 +121,7 @@ router.get('/teacher-accounts', async (req, res) => {
 
 // GET /api/users/admin-accounts - list all system admins (super_admin)
 router.get('/admin-accounts', async (req, res) => {
-  const admins = await db.all("SELECT id,username,email,fullName,role,status,className,registrationDate,linkedStudentId,linkedTeacherId,twoFactorEnabled FROM users WHERE role = ? ORDER BY id", ['super_admin']);
+  const admins = await db.all("SELECT id,username,email,fullName,role,status,className,registrationDate,linkedStudentId,linkedTeacherId,twoFactorEnabled,(CASE WHEN twoFactorSecret IS NULL THEN 0 ELSE 1 END) AS twoFactorSetUp FROM users WHERE role = ? ORDER BY id", ['super_admin']);
   res.json(admins);
 });
 

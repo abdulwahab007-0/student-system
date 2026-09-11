@@ -57,6 +57,24 @@ router.post('/login', async (req, res) => {
 
   // ── Two-factor authentication ──────────────────────────────────────────
   if (user.twoFactorEnabled) {
+    // 2FA required for this account. If a TOTP secret exists the user has
+    // already set it up → ask for the OTP. Otherwise (an admin just required
+    // 2FA for them) → first run the QR setup flow, then verify.
+    if (!user.twoFactorSecret) {
+      const secret = authenticator.generateSecret();
+      await db.run('UPDATE users SET twoFactorSecret = ? WHERE id = ?', [secret, user.id]);
+      user.twoFactorSecret = secret;
+      const otpauthUrl = authenticator.keyuri(user.username, ISSUER, secret);
+      const qrDataUrl = await QRCode.toDataURL(otpauthUrl, { width: 240, margin: 1, errorCorrectionLevel: 'M' });
+      return res.json({
+        twoFactor: 'setup',
+        username: user.username,
+        fullName: user.fullName,
+        secret,
+        otpauthUrl,
+        qrDataUrl,
+      });
+    }
     // 2FA already configured — refuse to issue a token until the OTP matches.
     return res.json({ twoFactor: 'verify', username: user.username, fullName: user.fullName });
   }
@@ -163,14 +181,30 @@ router.put('/reset-password/:id', authMiddleware, requirePermission('reset_passw
 });
 
 // PUT /api/auth/reset-2fa/:id
-// Clears an admin's TOTP secret and disables 2FA so they can re-set up their
-// authenticator app at their next login (lost/broken phone recovery).
+// Clears a user's TOTP secret and disables 2FA so they can re-set it up at
+// their next login (lost/broken phone recovery). Works for admins, teachers
+// AND students.
 // Guarded by the 'reset_2fa' right — configurable per role or per user from the
 // User Rights page.
 router.put('/reset-2fa/:id', authMiddleware, requirePermission('reset_2fa'), async (req, res) => {
   const user = await db.get('SELECT * FROM users WHERE id = ?', [req.params.id]);
   if (!user) return res.status(404).json({ error: 'User not found' });
   await db.run('UPDATE users SET twoFactorSecret = NULL, twoFactorEnabled = 0 WHERE id = ?', [user.id]);
+  res.json({ success: true, user: { id: user.id, username: user.username, fullName: user.fullName } });
+});
+
+// PUT /api/auth/enable-2fa/:id
+// Requires two-factor authentication for a user. Their twoFactorEnabled flag is
+// switched on BEFORE they have a secret, so at their next login the app
+// generates a TOTP secret and walks them through scanning the QR code — this
+// works for students/teachers too, not just the admin roles that are enforced
+// unconditionally.
+// Guarded by the 'manage_2fa' right — configurable per role or per user from the
+// User Rights page.
+router.put('/enable-2fa/:id', authMiddleware, requirePermission('manage_2fa'), async (req, res) => {
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [req.params.id]);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  await db.run('UPDATE users SET twoFactorEnabled = 1 WHERE id = ?', [user.id]);
   res.json({ success: true, user: { id: user.id, username: user.username, fullName: user.fullName } });
 });
 
